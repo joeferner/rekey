@@ -3,10 +3,12 @@ use std::{fs::OpenOptions, io::Write};
 use windows::{
     core::s,
     Win32::{
+        Foundation::{HMODULE, LPARAM, LRESULT, WPARAM},
         System::LibraryLoader::GetProcAddress,
         UI::WindowsAndMessaging::{
-            CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, HHOOK, HOOKPROC, WH_KEYBOARD,
-        }, Foundation::{HMODULE, WPARAM, LPARAM, LRESULT},
+            CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, HC_ACTION, HHOOK, HOOKPROC,
+            WH_KEYBOARD,
+        },
     },
 };
 
@@ -57,6 +59,10 @@ pub extern "C" fn keyboard_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LR
 
     unsafe {
         if let Some(hook) = MY_HOOK {
+            if code < 0 || code != HC_ACTION as i32 {
+                return CallNextHookEx(hook, code, wparam, lparam);
+            }
+
             return CallNextHookEx(hook, code, wparam, lparam);
         } else {
             return LRESULT(0);
