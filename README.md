@@ -6,3 +6,4 @@
 - [USB Pendant for Universal Gcode Sender](https://www.instructables.com/USB-Pendant-for-Universal-G-Code-Sender-UGS-for-CN/)
 - [luamacros](https://github.com/me2d13/luamacros)
 - [Using Hooks](https://learn.microsoft.com/en-us/windows/win32/winmsg/using-hooks)
+- [Building a Win32 Rust App From Scratch](https://rust-tutorials.github.io/triangle-from-scratch/opening_a_window/win32.html)

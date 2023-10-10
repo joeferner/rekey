@@ -1,4 +1,4 @@
-use std::{fs::OpenOptions, io::Write};
+use std::{fmt, fs::OpenOptions, io::Write};
 
 use windows::{
     core::s,
@@ -25,29 +25,83 @@ fn debug(s: String) -> () {
     }
 }
 
+#[derive(Debug)]
+pub enum RekeyError {
+    GenericError(String),
+    Win32GetLastError(String, Result<(), windows::core::Error>),
+    Win32Error(String, windows::core::Error),
+}
+
+impl fmt::Display for RekeyError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RekeyError::GenericError(s) => {
+                write!(f, "Generic Error: {}", s)
+            }
+            RekeyError::Win32GetLastError(s, error) => {
+                let error_as_string = match error {
+                    Result::Ok(()) => "".to_string(),
+                    Result::Err(e) => format!("{}", e),
+                };
+                write!(f, "Win32 Error: {}: {}", s, error_as_string)
+            }
+            RekeyError::Win32Error(s, error) => {
+                write!(f, "Win32 Error: {}: {}", s, error)
+            }
+        }
+    }
+}
+
 #[no_mangle]
-pub extern "C" fn install(dll: HMODULE) -> () {
+pub extern "C" fn install(dll: HMODULE) -> bool {
+    match _install(dll) {
+        Result::Err(err) => {
+            debug(format!("install failed {}", err));
+            return false;
+        }
+        Result::Ok(()) => {
+            return true;
+        }
+    };
+}
+
+fn _install(dll: HMODULE) -> Result<(), RekeyError> {
     unsafe {
-        let keyboard_hook_bare =
-            GetProcAddress(dll, s!("keyboard_hook")).expect("failed to find keyboard_hook");
+        let keyboard_hook_bare = GetProcAddress(dll, s!("keyboard_hook"))
+            .ok_or_else(|| RekeyError::GenericError("failed to find keyboard_hook".to_string()))?;
         let keyboard_hook =
             std::mem::transmute::<Option<PROC>, HOOKPROC>(Option::Some(keyboard_hook_bare));
-        let hook =
-            SetWindowsHookExW(WH_KEYBOARD, keyboard_hook, dll, 0).expect("failed to set hook");
+        let hook = SetWindowsHookExW(WH_KEYBOARD, keyboard_hook, dll, 0)
+            .map_err(|err| RekeyError::Win32Error("failed to set hook".to_string(), err))?;
 
         MY_HOOK = Option::Some(hook);
     }
     debug("installed".to_string());
+    return Result::Ok(());
 }
 
 #[no_mangle]
-pub extern "C" fn uninstall() -> () {
+pub extern "C" fn uninstall() -> bool {
+    match _uninstall() {
+        Result::Err(err) => {
+            debug(format!("uninstall failed {}", err));
+            return false;
+        }
+        Result::Ok(()) => {
+            return true;
+        }
+    };
+}
+
+fn _uninstall() -> Result<(), RekeyError> {
     unsafe {
         if let Some(hook) = MY_HOOK {
-            UnhookWindowsHookEx(hook).expect("failed to unhook");
+            UnhookWindowsHookEx(hook)
+                .map_err(|err| RekeyError::Win32Error("failed to unhook".to_string(), err))?;
         }
     }
     debug("uninstalled".to_string());
+    return Result::Ok(());
 }
 
 #[no_mangle]
