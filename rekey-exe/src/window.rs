@@ -1,16 +1,24 @@
+use std::ffi::c_void;
 use std::mem::size_of;
 use windows::{
     core::{w, PCWSTR},
     Win32::{
         Foundation::{GetLastError, BOOL, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
         System::LibraryLoader::GetModuleHandleW,
-        UI::WindowsAndMessaging::{
-            CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW,
-            LoadCursorW, PostQuitMessage, RegisterClassExW, ShowWindow, TranslateMessage,
-            IDC_ARROW, MSG, SW_SHOW, WINDOW_EX_STYLE, WM_CLOSE, WM_DESTROY, WM_INPUT, WNDCLASSEXW,
-            WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_THICKFRAME,
+        UI::{
+            Input::{GetRawInputData, RAWINPUT, RAWINPUTHEADER},
+            WindowsAndMessaging::{
+                CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW,
+                LoadCursorW, PostQuitMessage, RegisterClassExW, ShowWindow, TranslateMessage,
+                IDC_ARROW, MSG, SW_SHOW, WINDOW_EX_STYLE, WM_CLOSE, WM_DESTROY, WM_INPUT,
+                WNDCLASSEXW, WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU,
+                WS_THICKFRAME,
+            },
         },
-        UI::WindowsAndMessaging::{CW_USEDEFAULT, HMENU},
+        UI::{
+            Input::{HRAWINPUT, RID_INPUT},
+            WindowsAndMessaging::{CW_USEDEFAULT, HMENU},
+        },
     },
 };
 
@@ -64,19 +72,75 @@ fn window_proc(
         WM_CLOSE => unsafe {
             DestroyWindow(hwnd)
                 .map_err(|e| RekeyError::Win32Error("DestroyWindow".to_string(), e))?;
+            return Result::Ok(LRESULT(0));
         },
         WM_DESTROY => unsafe {
             PostQuitMessage(0);
+            return Result::Ok(LRESULT(0));
         },
         WM_INPUT => {
-            println!("WM_INPUT");
-            return Result::Ok(LRESULT(0));
+            return handle_wm_input(hwnd, msg, wparam, lparam);
         }
         _ => unsafe {
             return Result::Ok(DefWindowProcW(hwnd, msg, wparam, lparam));
         },
     }
-    return Result::Ok(LRESULT(0));
+}
+
+fn handle_wm_input(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> Result<LRESULT, RekeyError> {
+    unsafe {
+        let raw_input_data = get_raw_input_data(lparam)?;
+        println!("dwSize: {}", raw_input_data.header.dwSize);
+        println!("dwType: {}", raw_input_data.header.dwType);
+        println!("hDevice: {:#04x}", raw_input_data.header.hDevice.0);
+        return Result::Ok(DefWindowProcW(hwnd, msg, wparam, lparam));
+    }
+}
+
+fn get_raw_input_data(lparam: LPARAM) -> Result<RAWINPUT, RekeyError> {
+    unsafe {
+        let mut pcbsize: u32 = 0;
+        let get_raw_input_data_size_result = GetRawInputData(
+            HRAWINPUT(lparam.0),
+            RID_INPUT,
+            Option::None,
+            &mut pcbsize,
+            size_of::<RAWINPUTHEADER>() as u32,
+        );
+        if get_raw_input_data_size_result != 0 {
+            return Result::Err(RekeyError::GenericError(
+                "failed to get raw input data size".to_string(),
+            ));
+        }
+        if pcbsize > size_of::<RAWINPUT>() as u32 {
+            return Result::Err(RekeyError::GenericError(format!(
+                "unexpected raw input size expected size less than {} but found {}",
+                size_of::<RAWINPUT>() as u32,
+                pcbsize
+            )));
+        }
+
+        let mut raw_input: RAWINPUT = RAWINPUT::default();
+        let get_raw_input_data_result = GetRawInputData(
+            HRAWINPUT(lparam.0),
+            RID_INPUT,
+            Option::Some(std::ptr::addr_of_mut!(raw_input) as *mut c_void),
+            &mut pcbsize,
+            size_of::<RAWINPUTHEADER>() as u32,
+        );
+        if get_raw_input_data_result != pcbsize {
+            return Result::Err(RekeyError::GenericError(
+                "failed to get raw input data".to_string(),
+            ));
+        }
+
+        return Result::Ok(raw_input);
+    }
 }
 
 pub fn create_window() -> Result<HWND, RekeyError> {
