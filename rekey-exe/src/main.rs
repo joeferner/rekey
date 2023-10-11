@@ -1,7 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod devices;
 mod dll;
 mod raw_input;
+mod win32hal;
 mod window;
 
 use dll::RekeyDll;
@@ -71,4 +73,18 @@ pub fn debug(s: String) -> () {
         let _ = writeln!(&mut f, "{}", s).is_ok();
     }
     println!("{}", s);
+}
+
+pub enum KeyDirection {
+    Down,
+    Up,
+}
+
+impl fmt::Display for KeyDirection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            KeyDirection::Down => write!(f, "Down"),
+            KeyDirection::Up => write!(f, "Up"),
+        }
+    }
 }
