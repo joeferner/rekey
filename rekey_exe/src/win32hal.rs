@@ -100,8 +100,7 @@ pub fn get_raw_input_device_info_device_name(hdevice: HANDLE) -> Result<String, 
         let mut pcbsize: u32 = 0;
         let get_raw_input_device_info_size_result =
             GetRawInputDeviceInfoW(hdevice, RIDI_DEVICENAME, Option::None, &mut pcbsize);
-        if get_raw_input_device_info_size_result == -1i32 as u32
-        {
+        if get_raw_input_device_info_size_result == -1i32 as u32 {
             return Result::Err(RekeyError::Win32GetLastError(
                 "failed GetRawInputDeviceInfoW size".to_string(),
                 GetLastError(),
@@ -129,7 +128,7 @@ pub fn get_raw_input_device_info_device_name(hdevice: HANDLE) -> Result<String, 
             ));
         }
 
-        let device_name_slice = &device_name[0..get_raw_input_device_info_result as usize];
+        let device_name_slice = &device_name[0..(get_raw_input_device_info_result - 1) as usize];
         let converted_string: OsString = OsStringExt::from_wide(device_name_slice);
         return match converted_string.into_string() {
             Ok(str) => Result::Ok(str),

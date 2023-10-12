@@ -10,6 +10,13 @@ pub enum RekeyError {
     GenericError(String),
     Win32GetLastError(String, Result<(), windows::core::Error>),
     Win32Error(String, windows::core::Error),
+    IoError(std::io::Error),
+}
+
+impl From<std::io::Error> for RekeyError {
+    fn from(err: std::io::Error) -> Self {
+        return RekeyError::IoError(err);
+    }
 }
 
 impl fmt::Display for RekeyError {
@@ -28,6 +35,9 @@ impl fmt::Display for RekeyError {
             RekeyError::Win32Error(s, error) => {
                 write!(f, "Win32 Error: {}: {}", s, error)
             }
+            RekeyError::IoError(error) => {
+                write!(f, "IO Error: {}", error)
+            }
         }
     }
 }
@@ -43,7 +53,7 @@ pub fn debug(s: String) -> () {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum KeyDirection {
     Down,
     Up,

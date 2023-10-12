@@ -28,6 +28,7 @@ dependencies = [
 name = "rekey_lib"
 version = "0.1.0"
 dependencies = [
+ "lazy_static",
  "rekey_common",
  "windows",
 ]

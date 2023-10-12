@@ -94,7 +94,6 @@ fn window_proc(
 }
 
 fn handle_should_skip_input(wparam: WPARAM, lparam: LPARAM) -> Result<LRESULT, RekeyError> {
-    debug("handle_should_skip_input".to_string());
     let vkey_code = wparam.0 as u16;
     let direction = if lparam.0 >> 31 == 0 {
         KeyDirection::Down
@@ -102,7 +101,12 @@ fn handle_should_skip_input(wparam: WPARAM, lparam: LPARAM) -> Result<LRESULT, R
         KeyDirection::Up
     };
     let device = input_log_get_device(vkey_code, direction)?;
-    println!("device {}", device.unwrap().device_name);
+    debug(format!(
+        "handle_should_skip_input {} {} {}",
+        device.unwrap().device_name,
+        vkey_code,
+        direction
+    ));
     return Result::Ok(LRESULT(0));
 }
 

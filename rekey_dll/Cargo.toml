@@ -7,6 +7,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
+lazy_static = "1.4.0"
 rekey_common = { path = "../rekey_common/", version = "0.1.0" }
 
 [dependencies.windows]
