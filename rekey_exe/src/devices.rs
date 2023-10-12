@@ -1,12 +1,10 @@
 use lazy_static::lazy_static;
+use rekey_common::RekeyError;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use windows::Win32::Foundation::HANDLE;
 
-use crate::{
-    win32hal::{get_raw_input_device_info_device_name, get_raw_input_device_list},
-    RekeyError,
-};
+use crate::win32hal::{get_raw_input_device_info_device_name, get_raw_input_device_list};
 
 pub struct Device {
     pub hdevice: HANDLE,

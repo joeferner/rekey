@@ -1,40 +1,9 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
-mod devices;
-mod dll;
-mod raw_input;
-mod win32hal;
-mod window;
-
-use dll::RekeyDll;
-use raw_input::RawInput;
 use std::{fmt, fs::OpenOptions, io::Write};
-use window::{create_window, message_loop};
 
-fn main() {
-    match _main() {
-        Result::Ok(()) => {}
-        Result::Err(err) => {
-            debug(format!("main failed: {}", err));
-        }
-    };
-}
+use windows::Win32::{Foundation::LRESULT, UI::WindowsAndMessaging::WM_USER};
 
-fn _main() -> Result<(), RekeyError> {
-    let window = create_window()?;
-
-    let mut dll = RekeyDll::new()?;
-    dll.install()?;
-
-    let mut raw_input = RawInput::new(window)?;
-
-    message_loop()?;
-
-    dll.uninstall()?;
-    raw_input.uninstall()?;
-
-    return Result::Ok(());
-}
+pub const WM_REKEY_SHOULD_SKIP_INPUT: u32 = WM_USER + 300;
+pub const SKIP_INPUT: LRESULT = LRESULT(42);
 
 #[derive(Debug)]
 pub enum RekeyError {
@@ -72,9 +41,9 @@ pub fn debug(s: String) -> () {
     if let Result::Ok(mut f) = file {
         let _ = writeln!(&mut f, "{}", s).is_ok();
     }
-    println!("{}", s);
 }
 
+#[derive(PartialEq, Eq)]
 pub enum KeyDirection {
     Down,
     Up,

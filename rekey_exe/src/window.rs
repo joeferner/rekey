@@ -1,3 +1,4 @@
+use rekey_common::{KeyDirection, WM_REKEY_SHOULD_SKIP_INPUT};
 use std::mem::size_of;
 use windows::{
     core::{w, PCWSTR},
@@ -18,7 +19,13 @@ use windows::{
     },
 };
 
-use crate::{debug, devices::find_device, win32hal::get_raw_input_data, KeyDirection, RekeyError};
+use crate::{
+    debug,
+    devices::find_device,
+    input_log::{input_log_add_wm_input, input_log_get_device},
+    win32hal::get_raw_input_data,
+    RekeyError,
+};
 
 pub fn message_loop() -> Result<(), RekeyError> {
     unsafe {
@@ -77,10 +84,26 @@ fn window_proc(
         WM_INPUT => {
             return handle_wm_input(hwnd, msg, wparam, lparam);
         }
+        WM_REKEY_SHOULD_SKIP_INPUT => {
+            return handle_should_skip_input(wparam, lparam);
+        }
         _ => unsafe {
             return Result::Ok(DefWindowProcW(hwnd, msg, wparam, lparam));
         },
     }
+}
+
+fn handle_should_skip_input(wparam: WPARAM, lparam: LPARAM) -> Result<LRESULT, RekeyError> {
+    debug("handle_should_skip_input".to_string());
+    let vkey_code = wparam.0 as u16;
+    let direction = if lparam.0 >> 31 == 0 {
+        KeyDirection::Down
+    } else {
+        KeyDirection::Up
+    };
+    let device = input_log_get_device(vkey_code, direction)?;
+    println!("device {}", device.unwrap().device_name);
+    return Result::Ok(LRESULT(0));
 }
 
 fn handle_wm_input(
@@ -92,6 +115,7 @@ fn handle_wm_input(
     let raw_input_data = get_raw_input_data(lparam)?;
     if raw_input_data.header.dwType == RIM_TYPEKEYBOARD.0 {
         let keyboard_message = unsafe { raw_input_data.data.keyboard.Message };
+        let vkey_code = unsafe { raw_input_data.data.keyboard.VKey };
         let direction = match keyboard_message {
             WM_KEYDOWN => KeyDirection::Down,
             WM_SYSKEYDOWN => KeyDirection::Down,
@@ -100,9 +124,7 @@ fn handle_wm_input(
             _ => KeyDirection::Down,
         };
         let device = find_device(raw_input_data.header.hDevice)?;
-        println!("hdevice {}", device.hdevice.0);
-        println!("device_name {}", device.device_name);
-        println!("direction {}", direction);
+        input_log_add_wm_input(device, vkey_code, direction)?;
     }
     unsafe {
         return Result::Ok(DefWindowProcW(hwnd, msg, wparam, lparam));

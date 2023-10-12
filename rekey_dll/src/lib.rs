@@ -1,60 +1,23 @@
-use std::{fmt, fs::OpenOptions, io::Write};
-
+use rekey_common::{debug, RekeyError, SKIP_INPUT, WM_REKEY_SHOULD_SKIP_INPUT};
 use windows::{
     core::s,
     Win32::{
-        Foundation::{HMODULE, LPARAM, LRESULT, WPARAM},
+        Foundation::{HMODULE, HWND, LPARAM, LRESULT, WPARAM},
         System::LibraryLoader::GetProcAddress,
         UI::WindowsAndMessaging::{
-            CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, HC_ACTION, HHOOK, HOOKPROC,
-            WH_KEYBOARD,
+            CallNextHookEx, SendMessageW, SetWindowsHookExW, UnhookWindowsHookEx, HC_ACTION, HHOOK,
+            HOOKPROC, WH_KEYBOARD,
         },
     },
 };
 
 type PROC = unsafe extern "system" fn() -> isize;
 static mut MY_HOOK: Option<HHOOK> = Option::None;
-
-fn debug(s: String) -> () {
-    let file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .open("C:\\dev\\rekey\\target\\out.txt");
-    if let Result::Ok(mut f) = file {
-        let _ = writeln!(&mut f, "{}", s).is_ok();
-    }
-}
-
-#[derive(Debug)]
-pub enum RekeyError {
-    GenericError(String),
-    Win32GetLastError(String, Result<(), windows::core::Error>),
-    Win32Error(String, windows::core::Error),
-}
-
-impl fmt::Display for RekeyError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            RekeyError::GenericError(s) => {
-                write!(f, "Generic Error: {}", s)
-            }
-            RekeyError::Win32GetLastError(s, error) => {
-                let error_as_string = match error {
-                    Result::Ok(()) => "".to_string(),
-                    Result::Err(e) => format!("{}", e),
-                };
-                write!(f, "Win32 Error: {}: {}", s, error_as_string)
-            }
-            RekeyError::Win32Error(s, error) => {
-                write!(f, "Win32 Error: {}: {}", s, error)
-            }
-        }
-    }
-}
+static mut MY_HWND: Option<HWND> = Option::None;
 
 #[no_mangle]
-pub extern "C" fn install(dll: HMODULE) -> bool {
-    match _install(dll) {
+pub extern "C" fn install(dll: HMODULE, hwnd: HWND) -> bool {
+    match _install(dll, hwnd) {
         Result::Err(err) => {
             debug(format!("install failed {}", err));
             return false;
@@ -65,8 +28,12 @@ pub extern "C" fn install(dll: HMODULE) -> bool {
     };
 }
 
-fn _install(dll: HMODULE) -> Result<(), RekeyError> {
+fn _install(dll: HMODULE, hwnd: HWND) -> Result<(), RekeyError> {
     unsafe {
+        if MY_HOOK.is_some() {
+            return Result::Err(RekeyError::GenericError("already installed".to_string()));
+        }
+
         let keyboard_hook_bare = GetProcAddress(dll, s!("keyboard_hook"))
             .ok_or_else(|| RekeyError::GenericError("failed to find keyboard_hook".to_string()))?;
         let keyboard_hook =
@@ -74,6 +41,7 @@ fn _install(dll: HMODULE) -> Result<(), RekeyError> {
         let hook = SetWindowsHookExW(WH_KEYBOARD, keyboard_hook, dll, 0)
             .map_err(|err| RekeyError::Win32Error("failed to set hook".to_string(), err))?;
 
+        MY_HWND = Option::Some(hwnd);
         MY_HOOK = Option::Some(hook);
     }
     debug("installed".to_string());
@@ -95,9 +63,15 @@ pub extern "C" fn uninstall() -> bool {
 
 fn _uninstall() -> Result<(), RekeyError> {
     unsafe {
+        if MY_HOOK.is_none() {
+            return Result::Err(RekeyError::GenericError("not installed".to_string()));
+        }
+
         if let Some(hook) = MY_HOOK {
             UnhookWindowsHookEx(hook)
                 .map_err(|err| RekeyError::Win32Error("failed to unhook".to_string(), err))?;
+            MY_HOOK = Option::None;
+            MY_HWND = Option::None;
         }
     }
     debug("uninstalled".to_string());
@@ -112,14 +86,24 @@ pub extern "C" fn keyboard_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LR
     ));
 
     unsafe {
+        debug("1".to_string());
         if let Some(hook) = MY_HOOK {
-            if code < 0 || code != HC_ACTION as i32 {
+            debug("2".to_string());
+            if let Some(hwnd) = MY_HWND {
+                debug("3".to_string());
+                if code < 0 || code != HC_ACTION as i32 {
+                    return CallNextHookEx(hook, code, wparam, lparam);
+                }
+
+                debug("4".to_string());
+                let result = SendMessageW(hwnd, WM_REKEY_SHOULD_SKIP_INPUT, wparam, lparam);
+                debug(format!("5 {}", result.0));
+                if result == SKIP_INPUT {
+                    return LRESULT(1);
+                }
                 return CallNextHookEx(hook, code, wparam, lparam);
             }
-
-            return CallNextHookEx(hook, code, wparam, lparam);
-        } else {
-            return LRESULT(0);
         }
+        return LRESULT(0);
     }
 }

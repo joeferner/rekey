@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "rekey-dll",
-    "rekey-exe",
+    "rekey_common",
+    "rekey_dll",
+    "rekey_exe",
 ]

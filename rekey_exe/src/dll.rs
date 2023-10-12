@@ -1,7 +1,7 @@
 use windows::{
     core::{s, w},
     Win32::{
-        Foundation::{FreeLibrary, HMODULE},
+        Foundation::{FreeLibrary, HMODULE, HWND},
         System::LibraryLoader::{GetProcAddress, LoadLibraryW},
     },
 };
@@ -9,7 +9,7 @@ use windows::{
 use crate::{debug, RekeyError};
 
 type PROC = unsafe extern "system" fn() -> isize;
-type FnInstall = extern "stdcall" fn(dll: HMODULE) -> bool;
+type FnInstall = extern "stdcall" fn(dll: HMODULE, hwnd: HWND) -> bool;
 type FnUninstall = extern "stdcall" fn() -> bool;
 
 pub struct RekeyDll {
@@ -37,9 +37,9 @@ impl RekeyDll {
         }
     }
 
-    pub fn install(&mut self) -> Result<(), RekeyError> {
+    pub fn install(&mut self, hwnd: HWND) -> Result<(), RekeyError> {
         if let Option::Some(install) = self.install.take() {
-            if !install(self.dll) {
+            if !install(self.dll, hwnd) {
                 return Result::Err(RekeyError::GenericError("failed to install".to_string()));
             }
             return Result::Ok(());
