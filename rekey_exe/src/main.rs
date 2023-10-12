@@ -2,14 +2,17 @@
 
 mod devices;
 mod dll;
+mod input_log;
 mod raw_input;
 mod win32hal;
 mod window;
-mod input_log;
 
+use std::sync::Arc;
+
+use devices::Device;
 use dll::RekeyDll;
 use raw_input::RawInput;
-use rekey_common::{debug, RekeyError};
+use rekey_common::{debug, KeyDirection, RekeyError};
 use window::{create_window, message_loop};
 
 fn main() {
@@ -35,4 +38,12 @@ fn _main() -> Result<(), RekeyError> {
     raw_input.uninstall()?;
 
     return Result::Ok(());
+}
+
+pub fn should_skip_input(
+    vkey_code: u16,
+    direction: KeyDirection,
+    device: Option<Arc<Device>>,
+) -> Result<bool, RekeyError> {
+    return Result::Ok(true);
 }

@@ -1,11 +1,11 @@
-use rekey_common::{KeyDirection, WM_REKEY_SHOULD_SKIP_INPUT};
+use rekey_common::{KeyDirection, DONT_SKIP_INPUT, SKIP_INPUT, WM_REKEY_SHOULD_SKIP_INPUT};
 use std::mem::size_of;
 use windows::{
     core::{w, PCWSTR},
     Win32::{
         Foundation::{GetLastError, BOOL, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
         System::LibraryLoader::GetModuleHandleW,
-        UI::WindowsAndMessaging::{CW_USEDEFAULT, HMENU},
+        UI::WindowsAndMessaging::{PeekMessageW, CW_USEDEFAULT, HMENU, PM_REMOVE},
         UI::{
             Input::RIM_TYPEKEYBOARD,
             WindowsAndMessaging::{
@@ -23,6 +23,7 @@ use crate::{
     debug,
     devices::find_device,
     input_log::{input_log_add_wm_input, input_log_get_device},
+    should_skip_input,
     win32hal::get_raw_input_data,
     RekeyError,
 };
@@ -85,7 +86,7 @@ fn window_proc(
             return handle_wm_input(hwnd, msg, wparam, lparam);
         }
         WM_REKEY_SHOULD_SKIP_INPUT => {
-            return handle_should_skip_input(wparam, lparam);
+            return handle_should_skip_input(hwnd, wparam, lparam);
         }
         _ => unsafe {
             return Result::Ok(DefWindowProcW(hwnd, msg, wparam, lparam));
@@ -93,21 +94,37 @@ fn window_proc(
     }
 }
 
-fn handle_should_skip_input(wparam: WPARAM, lparam: LPARAM) -> Result<LRESULT, RekeyError> {
+fn handle_should_skip_input(
+    hwnd: HWND,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> Result<LRESULT, RekeyError> {
     let vkey_code = wparam.0 as u16;
     let direction = if lparam.0 >> 31 == 0 {
         KeyDirection::Down
     } else {
         KeyDirection::Up
     };
-    let device = input_log_get_device(vkey_code, direction)?;
-    debug(format!(
-        "handle_should_skip_input {} {} {}",
-        device.unwrap().device_name,
-        vkey_code,
-        direction
-    ));
-    return Result::Ok(LRESULT(0));
+    let mut device = input_log_get_device(vkey_code, direction)?;
+    if device.is_none() {
+        process_waiting_input_messages(hwnd)?;
+        device = input_log_get_device(vkey_code, direction)?;
+    }
+
+    let result = should_skip_input(vkey_code, direction, device)?;
+    if result {
+        return Result::Ok(SKIP_INPUT);
+    } else {
+        return Result::Ok(DONT_SKIP_INPUT);
+    }
+}
+
+fn process_waiting_input_messages(hwnd: HWND) -> Result<(), RekeyError> {
+    let mut msg: MSG = MSG::default();
+    while unsafe { PeekMessageW(&mut msg, hwnd, WM_INPUT, WM_INPUT, PM_REMOVE).as_bool() } {
+        handle_wm_input(msg.hwnd, msg.message, msg.wParam, msg.lParam)?;
+    }
+    return Result::Ok(());
 }
 
 fn handle_wm_input(

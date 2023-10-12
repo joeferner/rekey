@@ -3,6 +3,7 @@ use std::{fmt, fs::OpenOptions, io::Write};
 use windows::Win32::{Foundation::LRESULT, UI::WindowsAndMessaging::WM_USER};
 
 pub const WM_REKEY_SHOULD_SKIP_INPUT: u32 = WM_USER + 300;
+pub const DONT_SKIP_INPUT: LRESULT = LRESULT(1);
 pub const SKIP_INPUT: LRESULT = LRESULT(42);
 
 #[derive(Debug)]
