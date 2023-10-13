@@ -4,8 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+boa_engine = "0.17.3"
+boa_gc = "0.17.3"
+directories = "5.0.1"
 lazy_static = "1.4.0"
 rekey_common = { path = "../rekey_common/", version = "0.1.0" }
+rustc-hash = { version = "1.1.0", features = ["std"] }
 
 [dependencies.windows]
 version = "0.51.1"
