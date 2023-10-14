@@ -3,12 +3,17 @@ use boa_engine::{
     NativeFunction, Source,
 };
 use lazy_static::lazy_static;
-use rekey_common::{debug, get_scripts_dir, KeyDirection, RekeyError};
+use rekey_common::{debug, get_scripts_dir, to_virtual_key, KeyDirection, RekeyError};
 use std::{
     fs,
+    mem::size_of,
     path::PathBuf,
     sync::{mpsc, Arc, Mutex},
     thread,
+};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY,
+    VK_CONTROL, VK_MENU, VK_SHIFT,
 };
 
 use crate::{devices::Device, js, SkipInput};
@@ -295,7 +300,107 @@ fn initialize_context(
             RekeyError::GenericError(format!("failed to register rekeyRegister: {}", err))
         })?;
 
+    context
+        .register_global_callable("sendKey", 0, NativeFunction::from_fn_ptr(handle_send_key))
+        .map_err(|err| {
+            RekeyError::GenericError(format!("failed to register rekeyRegister: {}", err))
+        })?;
+
     return Result::Ok(());
+}
+
+fn handle_send_key(
+    _this: &JsValue,
+    args: &[JsValue],
+    _context: &mut Context<'_>,
+) -> Result<JsValue, JsError> {
+    if args.len() == 1 {
+        let arg0 = args.get(0).unwrap();
+        if arg0.is_string() {
+            let key_expr = arg0.as_string().unwrap().to_std_string_escaped();
+
+            let mut inputs: Vec<INPUT> = vec![];
+
+            fn add_key_to_input(
+                inputs: &mut Vec<INPUT>,
+                key_expr_part: &str,
+                up: bool,
+            ) -> Result<(), JsError> {
+                let r =
+                    to_virtual_key(key_expr_part).map_err(|err| {
+                        JsError::from(JsNativeError::error().with_message(format!(
+                            "could not covert key {}: {}",
+                            key_expr_part, err
+                        )))
+                    })?;
+
+                if up {
+                    inputs.push(create_input(r.vkey, true));
+                }
+                if r.ctrl {
+                    inputs.push(create_input(VK_CONTROL, up));
+                }
+                if r.alt {
+                    inputs.push(create_input(VK_MENU, up));
+                }
+                if r.shift {
+                    inputs.push(create_input(VK_SHIFT, up));
+                }
+                if r.hankaku {
+                    return Result::Err(JsError::from(
+                        JsNativeError::error().with_message("could not handle hankaku"),
+                    ));
+                }
+                if !up {
+                    inputs.push(create_input(r.vkey, false));
+                }
+                return Result::Ok(());
+            }
+
+            let key_expr_parts: Vec<&str> = key_expr.split("+").collect();
+            for key_expr_part in &key_expr_parts {
+                add_key_to_input(&mut inputs, key_expr_part, false)?;
+            }
+
+            let key_expr_parts_rev: Vec<&str> = key_expr_parts.iter().copied().rev().collect();
+            for key_expr_part in key_expr_parts_rev {
+                add_key_to_input(&mut inputs, key_expr_part, true)?;
+            }
+
+            let cbsize = size_of::<INPUT>();
+            unsafe {
+                let r = SendInput(&inputs, cbsize as i32) as usize;
+                if r != inputs.len() {
+                    return Result::Err(JsError::from(
+                        JsNativeError::error().with_message("failed to send all inputs"),
+                    ));
+                }
+            }
+
+            return Result::Ok(JsValue::Undefined);
+        } else {
+            return Result::Err(JsError::from(
+                JsNativeError::error().with_message("invalid arguments, expected sendKey(string)"),
+            ));
+        }
+    } else {
+        return Result::Err(JsError::from(JsNativeError::error().with_message(format!(
+            "invalid arguments, expected 1 found {}",
+            args.len()
+        ))));
+    }
+}
+
+fn create_input(vkey: VIRTUAL_KEY, up: bool) -> INPUT {
+    let mut input = INPUT::default();
+    input.r#type = INPUT_KEYBOARD;
+    input.Anonymous = INPUT_0::default();
+    input.Anonymous.ki = KEYBDINPUT::default();
+    input.Anonymous.ki.wVk = vkey;
+    if up {
+        input.Anonymous.ki.dwFlags = KEYEVENTF_KEYUP;
+    }
+    return input;
 }
 
 fn handle_register(
@@ -315,7 +420,8 @@ fn handle_register(
             let callback = callback.as_callable().unwrap();
             if keys != "*" {
                 return Result::Err(JsError::from(
-                    JsNativeError::error().with_message("invalid keys arguments, expected \"*\""),
+                    JsNativeError::error()
+                        .with_message("invalid keys arguments for rekeyRegister, expected \"*\""),
                 ));
             }
             let devices = if devices == "*" {
@@ -331,12 +437,12 @@ fn handle_register(
         } else {
             return Result::Err(JsError::from(
                 JsNativeError::error()
-                    .with_message("invalid arguments, expected (string, string, callback)"),
+                    .with_message("invalid arguments, expected rekeyRegister(devices: string, keys: string, callback: (ctx) => boolean)"),
             ));
         }
     } else {
         return Result::Err(JsError::from(JsNativeError::error().with_message(format!(
-            "invalid arguments, expected 3 found {}",
+            "invalid arguments for rekeyRegister, expected 3 found {}",
             args.len()
         ))));
     }
