@@ -1,25 +1,28 @@
 use rekey_common::{
-    KeyDirection, DONT_SKIP_INPUT, SKIP_INPUT, WM_USER_SHELL_ICON, WM_USER_SHOULD_SKIP_INPUT,
+    get_log_filename, KeyDirection, DONT_SKIP_INPUT, SKIP_INPUT, WM_USER_SHELL_ICON,
+    WM_USER_SHOULD_SKIP_INPUT, get_scripts_dir,
 };
 use std::mem::size_of;
 use windows::{
-    core::{w, PCWSTR},
+    core::{w, HSTRING, PCWSTR},
     Win32::{
         Foundation::{GetLastError, BOOL, HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM},
         System::LibraryLoader::GetModuleHandleW,
         UI::{
             Input::RIM_TYPEKEYBOARD,
             Shell::{
-                NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_DELETE, NOTIFYICONDATAW, NOTIFY_ICON_DATA_FLAGS,
+                ShellExecuteW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_DELETE, NOTIFYICONDATAW,
+                NOTIFY_ICON_DATA_FLAGS,
             },
             WindowsAndMessaging::{
                 CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
                 GetCursorPos, GetMessageW, InsertMenuW, LoadCursorW, LoadIconW, PostMessageW,
                 PostQuitMessage, RegisterClassExW, TrackPopupMenu, TranslateMessage, IDC_ARROW,
-                MF_BYPOSITION, MF_STRING, MSG, TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_LEFTBUTTON,
-                WINDOW_EX_STYLE, WM_CLOSE, WM_COMMAND, WM_DESTROY, WM_INPUT, WM_KEYDOWN, WM_KEYUP,
-                WM_RBUTTONDOWN, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSEXW, WS_CAPTION,
-                WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_THICKFRAME,
+                MF_BYPOSITION, MF_STRING, MSG, SW_NORMAL, TPM_BOTTOMALIGN, TPM_LEFTALIGN,
+                TPM_LEFTBUTTON, WINDOW_EX_STYLE, WM_CLOSE, WM_COMMAND, WM_DESTROY, WM_INPUT,
+                WM_KEYDOWN, WM_KEYUP, WM_RBUTTONDOWN, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSEXW,
+                WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU,
+                WS_THICKFRAME,
             },
         },
         UI::{
@@ -33,7 +36,7 @@ use crate::{
     debug,
     devices::find_device,
     input_log::{input_log_add_wm_input, input_log_get_device},
-    should_skip_input,
+    scripts::{scripts_handle_input, scripts_load},
     win32hal::get_raw_input_data,
     RekeyError, SkipInput,
 };
@@ -41,6 +44,9 @@ use crate::{
 const SYS_TRAY_ID: u32 = 1001;
 
 const ID_MENU_EXIT: usize = 1;
+const ID_MENU_RELOAD_SCRIPTS: usize = 2;
+const ID_MENU_OPEN_SCRIPTS_FOLDER: usize = 3;
+const ID_MENU_OPEN_LOG: usize = 4;
 
 pub fn message_loop() -> Result<(), RekeyError> {
     unsafe {
@@ -122,6 +128,34 @@ fn handle_menu_click(hwnd: HWND, wparam: WPARAM, _lparam: LPARAM) -> Result<LRES
             })?;
             return Result::Ok(LRESULT(0));
         },
+        ID_MENU_OPEN_LOG => unsafe {
+            let log_file = HSTRING::from(get_log_filename()?.as_os_str());
+            ShellExecuteW(
+                hwnd,
+                w!("open"),
+                &log_file,
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_NORMAL,
+            );
+            return Result::Ok(LRESULT(0));
+        },
+        ID_MENU_OPEN_SCRIPTS_FOLDER => unsafe {
+            let scripts_dir = HSTRING::from(get_scripts_dir()?.as_os_str());
+            ShellExecuteW(
+                hwnd,
+                w!("explore"),
+                &scripts_dir,
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_NORMAL,
+            );
+            return Result::Ok(LRESULT(0));
+        },
+        ID_MENU_RELOAD_SCRIPTS => {
+            scripts_load()?;
+            return Result::Ok(LRESULT(0));
+        }
         _ => {
             return Result::Ok(LRESULT(0));
         }
@@ -150,6 +184,33 @@ fn handle_shell_icon_right_click(hwnd: HWND) -> Result<LRESULT, RekeyError> {
         let menu = CreatePopupMenu().map_err(|err| {
             RekeyError::GenericError(format!("failed to create popup menu: {}", err))
         })?;
+
+        InsertMenuW(
+            menu,
+            0xFFFFFFFF,
+            MF_BYPOSITION | MF_STRING,
+            ID_MENU_RELOAD_SCRIPTS,
+            w!("Reload Scripts"),
+        )
+        .map_err(|err| RekeyError::GenericError(format!("failed to insert menu item: {}", err)))?;
+
+        InsertMenuW(
+            menu,
+            0xFFFFFFFF,
+            MF_BYPOSITION | MF_STRING,
+            ID_MENU_OPEN_SCRIPTS_FOLDER,
+            w!("Open Scripts Folder"),
+        )
+        .map_err(|err| RekeyError::GenericError(format!("failed to insert menu item: {}", err)))?;
+
+        InsertMenuW(
+            menu,
+            0xFFFFFFFF,
+            MF_BYPOSITION | MF_STRING,
+            ID_MENU_OPEN_LOG,
+            w!("Open Log"),
+        )
+        .map_err(|err| RekeyError::GenericError(format!("failed to insert menu item: {}", err)))?;
 
         InsertMenuW(
             menu,
@@ -191,7 +252,7 @@ fn handle_should_skip_input(
         device = input_log_get_device(vkey_code, direction)?;
     }
 
-    let result = should_skip_input(vkey_code, direction, device)?;
+    let result = scripts_handle_input(vkey_code, direction, device)?;
     if result == SkipInput::Skip {
         return Result::Ok(SKIP_INPUT);
     } else {

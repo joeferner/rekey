@@ -3,7 +3,7 @@ use boa_engine::{
     NativeFunction, Source,
 };
 use lazy_static::lazy_static;
-use rekey_common::{debug, get_user_dir, KeyDirection, RekeyError};
+use rekey_common::{debug, get_scripts_dir, KeyDirection, RekeyError};
 use std::{
     fs,
     path::PathBuf,
@@ -56,15 +56,18 @@ pub fn scripts_load() -> Result<(), RekeyError> {
         .lock()
         .map_err(|err| RekeyError::GenericError(format!("could not get scripts lock: {}", err)))?;
     if let Option::Some(ch) = &mut *channel {
+        debug("stopping old scripts thread");
         ch.send(ThreadMessage::Exit).map_err(|err| {
             RekeyError::GenericError(format!("failed to send exit to thread: {}", err))
         })?;
         *channel = Option::None;
     }
 
+    debug("loading scripts");
+
     let (tx, rx) = mpsc::channel::<ThreadMessage>();
 
-    let script_dir = get_user_dir()?.join("scripts");
+    let script_dir = get_scripts_dir()?;
     fs::create_dir_all(&script_dir)?;
 
     *channel = Option::Some(tx);
@@ -88,6 +91,7 @@ fn scripts_thread(
     rx: mpsc::Receiver<ThreadMessage>,
     script_dir: PathBuf,
 ) -> () {
+    debug("script thread starting");
     let scripts = match load_scripts(script_dir) {
         Result::Err(err) => {
             debug!("init error: {}", err);
@@ -119,6 +123,7 @@ fn scripts_thread(
             },
         }
     }
+    debug("script thread stopped");
 }
 
 fn thread_handle_input_message(msg: InputMessage, scripts: &Vec<Script>) -> ThreadResponseMessage {

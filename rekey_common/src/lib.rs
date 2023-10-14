@@ -66,6 +66,10 @@ pub fn get_log_filename() -> Result<PathBuf, RekeyError> {
     return Result::Ok(get_user_dir()?.join("rekey.log"));
 }
 
+pub fn get_scripts_dir() -> Result<PathBuf, RekeyError> {
+    return Result::Ok(get_user_dir()?.join("scripts"));
+}
+
 pub fn debug<S>(s: S) -> ()
 where
     S: Into<String>,

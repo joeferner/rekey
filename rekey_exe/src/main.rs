@@ -9,14 +9,13 @@ mod scripts;
 mod win32hal;
 mod window;
 
-use std::{fs, sync::Arc};
+use std::fs;
 
-use devices::Device;
 use dll::RekeyDll;
 use raw_input::RawInput;
-use rekey_common::{debug, get_log_filename, KeyDirection, RekeyError};
-use scripts::{scripts_handle_input, scripts_load};
-use window::{add_systray_icon, create_window, message_loop, delete_systray_icon};
+use rekey_common::{debug, get_log_filename, RekeyError};
+use scripts::scripts_load;
+use window::{add_systray_icon, create_window, delete_systray_icon, message_loop};
 
 fn main() {
     match _main() {
@@ -66,12 +65,4 @@ fn reset_log_file() -> Result<(), RekeyError> {
 pub enum SkipInput {
     Skip,
     DontSkip,
-}
-
-pub fn should_skip_input(
-    vkey_code: u16,
-    direction: KeyDirection,
-    device: Option<Arc<Device>>,
-) -> Result<SkipInput, RekeyError> {
-    return scripts_handle_input(vkey_code, direction, device);
 }
