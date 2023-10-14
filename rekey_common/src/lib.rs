@@ -1,5 +1,6 @@
-use chrono::Utc;
-use std::{fmt, fs::OpenOptions, io::Write};
+use chrono::Local;
+use directories::ProjectDirs;
+use std::{fmt, fs::OpenOptions, io::Write, path::PathBuf};
 use windows::Win32::{Foundation::LRESULT, UI::WindowsAndMessaging::WM_USER};
 
 pub const WM_REKEY_SHOULD_SKIP_INPUT: u32 = WM_USER + 300;
@@ -43,16 +44,50 @@ impl fmt::Display for RekeyError {
     }
 }
 
-pub fn debug(s: String) -> () {
-    let file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .append(true)
-        .open("C:\\dev\\rekey\\target\\out.txt");
-    if let Result::Ok(mut f) = file {
-        let now = Utc::now();
-        let _ = writeln!(&mut f, "{}: {}", now.format("%+"), s).is_ok();
+pub fn get_user_dir() -> Result<PathBuf, RekeyError> {
+    match ProjectDirs::from("com.github", "joeferner", "rekey") {
+        Option::Some(proj_dir) => {
+            let mut p = proj_dir.config_dir().to_path_buf();
+            if p.ends_with("config") {
+                p = p.parent().unwrap_or(p.as_path()).to_path_buf();
+            }
+            return Result::Ok(p);
+        }
+        Option::None => {
+            return Result::Err(RekeyError::GenericError(
+                "could not get project dir".to_string(),
+            ));
+        }
     }
+}
+
+pub fn get_log_filename() -> Result<PathBuf, RekeyError> {
+    return Result::Ok(get_user_dir()?.join("rekey.log"));
+}
+
+pub fn debug<S>(s: S) -> ()
+where
+    S: Into<String>,
+{
+    if let Result::Ok(filename) = get_log_filename() {
+        let file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .append(true)
+            .open(filename);
+        if let Result::Ok(mut f) = file {
+            let now = Local::now();
+            let _ = writeln!(&mut f, "{}: {}", now.format("%F %X"), s.into()).is_ok();
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! debug {
+    ($($arg:tt)*) => {{
+        let res = $crate::debug(format!($($arg)*));
+        res
+    }}
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]

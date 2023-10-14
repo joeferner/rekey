@@ -803,7 +803,6 @@ version = "0.1.0"
 dependencies = [
  "boa_engine",
  "boa_gc",
- "directories",
  "lazy_static",
  "rekey_common",
  "rustc-hash",
@@ -815,6 +814,7 @@ name = "rekey_common"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "directories",
  "windows 0.51.1",
 ]
 

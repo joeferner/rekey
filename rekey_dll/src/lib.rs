@@ -34,7 +34,7 @@ lazy_static! {
 pub extern "C" fn install(dll: HMODULE, hwnd: HWND) -> bool {
     match _install(dll, hwnd) {
         Result::Err(err) => {
-            debug(format!("install failed {}", err));
+            debug!("install failed {}", err);
             return false;
         }
         Result::Ok(()) => {
@@ -64,7 +64,7 @@ fn _install(dll: HMODULE, hwnd: HWND) -> Result<(), RekeyError> {
         write_global_data(&d)?;
         *data = Option::Some(d);
     }
-    debug("installed".to_string());
+    debug("installed");
     return Result::Ok(());
 }
 
@@ -72,7 +72,7 @@ fn _install(dll: HMODULE, hwnd: HWND) -> Result<(), RekeyError> {
 pub extern "C" fn uninstall() -> bool {
     match _uninstall() {
         Result::Err(err) => {
-            debug(format!("uninstall failed {}", err));
+            debug!("uninstall failed {}", err);
             return false;
         }
         Result::Ok(()) => {
@@ -105,7 +105,7 @@ fn _uninstall() -> Result<(), RekeyError> {
 pub extern "C" fn keyboard_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match _keyboard_hook(code, wparam, lparam) {
         Result::Err(err) => {
-            debug(format!("keyboard_hook failed {}", err));
+            debug!("keyboard_hook failed {}", err);
             return LRESULT(0);
         }
         Result::Ok(r) => {

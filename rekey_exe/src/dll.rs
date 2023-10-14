@@ -69,7 +69,7 @@ impl Drop for RekeyDll {
     fn drop(&mut self) {
         if self.uninstall.is_some() {
             self.uninstall().unwrap_or_else(|err| {
-                debug(format!("failed to uninstall {}", err));
+                debug!("failed to uninstall {}", err);
                 return ();
             });
         }

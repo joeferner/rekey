@@ -8,6 +8,7 @@ crate-type = ["lib"]
 
 [dependencies]
 chrono = "0.4.31"
+directories = "5.0.1"
 
 [dependencies.windows]
 version = "0.51.1"

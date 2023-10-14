@@ -60,7 +60,7 @@ unsafe extern "system" fn window_proc_system(
             return r;
         }
         Err(err) => {
-            debug(format!("window proc error {}", err));
+            debug!("window proc error {}", err);
             return LRESULT(0);
         }
     }

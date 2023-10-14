@@ -9,13 +9,12 @@ mod scripts;
 mod win32hal;
 mod window;
 
-use directories::ProjectDirs;
-use std::{path::PathBuf, sync::Arc};
+use std::{fs, sync::Arc};
 
 use devices::Device;
 use dll::RekeyDll;
 use raw_input::RawInput;
-use rekey_common::{debug, KeyDirection, RekeyError};
+use rekey_common::{debug, get_log_filename, KeyDirection, RekeyError};
 use scripts::{scripts_handle_input, scripts_load};
 use window::{create_window, message_loop};
 
@@ -23,12 +22,15 @@ fn main() {
     match _main() {
         Result::Ok(()) => {}
         Result::Err(err) => {
-            debug(format!("main failed: {}", err));
+            debug!("main failed: {}", err);
         }
     };
 }
 
 fn _main() -> Result<(), RekeyError> {
+    reset_log_file()?;
+    debug("BEGIN");
+
     let window = create_window()?;
 
     scripts_load()?;
@@ -43,6 +45,18 @@ fn _main() -> Result<(), RekeyError> {
     dll.uninstall()?;
     raw_input.uninstall()?;
 
+    debug("END");
+    return Result::Ok(());
+}
+
+fn reset_log_file() -> Result<(), RekeyError> {
+    let log_filename = get_log_filename()?;
+    fs::create_dir_all(log_filename.parent().unwrap_or(&log_filename))?;
+    fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(log_filename)?;
     return Result::Ok(());
 }
 
@@ -58,17 +72,4 @@ pub fn should_skip_input(
     device: Option<Arc<Device>>,
 ) -> Result<SkipInput, RekeyError> {
     return scripts_handle_input(vkey_code, direction, device);
-}
-
-pub fn get_project_config_dir() -> Result<PathBuf, RekeyError> {
-    match ProjectDirs::from("com.github", "joeferner", "rekey") {
-        Option::Some(proj_dir) => {
-            return Result::Ok(proj_dir.config_dir().to_path_buf());
-        }
-        Option::None => {
-            return Result::Err(RekeyError::GenericError(
-                "could not get project dir".to_string(),
-            ));
-        }
-    }
 }

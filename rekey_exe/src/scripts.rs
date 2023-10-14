@@ -3,7 +3,7 @@ use boa_engine::{
     NativeFunction, Source,
 };
 use lazy_static::lazy_static;
-use rekey_common::{debug, KeyDirection, RekeyError};
+use rekey_common::{debug, get_user_dir, KeyDirection, RekeyError};
 use std::{
     fs,
     path::PathBuf,
@@ -11,7 +11,7 @@ use std::{
     thread,
 };
 
-use crate::{devices::Device, get_project_config_dir, js, SkipInput};
+use crate::{devices::Device, js, SkipInput};
 
 #[derive(PartialEq, Eq)]
 enum KeyHandlerDevices {
@@ -64,26 +64,41 @@ pub fn scripts_load() -> Result<(), RekeyError> {
 
     let (tx, rx) = mpsc::channel::<ThreadMessage>();
 
-    let script_dir = get_project_config_dir()?.join("scripts");
+    let script_dir = get_user_dir()?.join("scripts");
     fs::create_dir_all(&script_dir)?;
 
     *channel = Option::Some(tx);
+    let (init_tx, init_rx) = mpsc::channel();
     thread::spawn(move || {
-        scripts_thread(rx, script_dir);
+        scripts_thread(init_tx, rx, script_dir);
     });
+
+    let init_result = init_rx
+        .recv()
+        .map_err(|err| RekeyError::GenericError(format!("failed to receive: {}", err)))?;
+    if let Result::Err(err) = init_result {
+        return Result::Err(err);
+    }
 
     return Result::Ok(());
 }
 
-fn scripts_thread(rx: mpsc::Receiver<ThreadMessage>, script_dir: PathBuf) -> () {
+fn scripts_thread(
+    tx: mpsc::Sender<Result<(), RekeyError>>,
+    rx: mpsc::Receiver<ThreadMessage>,
+    script_dir: PathBuf,
+) -> () {
     let scripts = match load_scripts(script_dir) {
         Result::Err(err) => {
-            // send back to main thread
-            debug(format!("failed to load scripts: {}", err));
+            debug!("init error: {}", err);
+            tx.send(Result::Err(err))
+                .unwrap_or_else(move |err| debug!("failed to send init error: {}", err));
             return;
         }
         Result::Ok(scripts) => scripts,
     };
+    tx.send(Result::Ok(()))
+        .unwrap_or_else(|err| debug!("failed to send init: {}", err));
 
     loop {
         match rx.recv() {
@@ -97,7 +112,7 @@ fn scripts_thread(rx: mpsc::Receiver<ThreadMessage>, script_dir: PathBuf) -> () 
                 ThreadMessage::HandleInput(tx, msg) => {
                     tx.send(thread_handle_input_message(msg, &scripts))
                         .unwrap_or_else(|err| {
-                            debug(format!("failed to send message: {}", err));
+                            debug!("failed to send message: {}", err);
                             return ();
                         });
                 }
@@ -196,7 +211,7 @@ fn load_scripts<'a>(script_dir: PathBuf) -> Result<Vec<Script<'a>>, RekeyError> 
     for entry in fs::read_dir(&script_dir)? {
         let entry = entry?;
         let entry_path = entry.path();
-        debug(format!("running script: {}", entry_path.display()));
+        debug!("loading script: {}", entry_path.display());
 
         let mut context = Context::default();
         let key_handlers: Arc<Mutex<Vec<KeyHandler>>> = Arc::new(Mutex::new(vec![]));

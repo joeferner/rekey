@@ -40,10 +40,10 @@ fn logger(msg: LogMessage, console_state: &Console) {
 
     match msg {
         LogMessage::Error(msg) => {
-            debug(format!("console.error: {msg:>indent$}"));
+            debug!("console.error: {msg:>indent$}");
         }
         LogMessage::Log(msg) | LogMessage::Info(msg) | LogMessage::Warn(msg) => {
-            debug(format!("console.log: {msg:>indent$}"));
+            debug!("console.log: {msg:>indent$}");
         }
     }
 }
