@@ -1,5 +1,5 @@
+use chrono::Utc;
 use std::{fmt, fs::OpenOptions, io::Write};
-
 use windows::Win32::{Foundation::LRESULT, UI::WindowsAndMessaging::WM_USER};
 
 pub const WM_REKEY_SHOULD_SKIP_INPUT: u32 = WM_USER + 300;
@@ -50,7 +50,8 @@ pub fn debug(s: String) -> () {
         .append(true)
         .open("C:\\dev\\rekey\\target\\out.txt");
     if let Result::Ok(mut f) = file {
-        let _ = writeln!(&mut f, "{}", s).is_ok();
+        let now = Utc::now();
+        let _ = writeln!(&mut f, "{}: {}", now.format("%+"), s).is_ok();
     }
 }
 

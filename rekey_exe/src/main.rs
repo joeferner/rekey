@@ -46,11 +46,17 @@ fn _main() -> Result<(), RekeyError> {
     return Result::Ok(());
 }
 
+#[derive(PartialEq, Eq)]
+pub enum SkipInput {
+    Skip,
+    DontSkip,
+}
+
 pub fn should_skip_input(
     vkey_code: u16,
     direction: KeyDirection,
     device: Option<Arc<Device>>,
-) -> Result<bool, RekeyError> {
+) -> Result<SkipInput, RekeyError> {
     return scripts_handle_input(vkey_code, direction, device);
 }
 

@@ -6,6 +6,9 @@ edition = "2021"
 [lib]
 crate-type = ["lib"]
 
+[dependencies]
+chrono = "0.4.31"
+
 [dependencies.windows]
 version = "0.51.1"
 features = [

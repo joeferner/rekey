@@ -25,7 +25,7 @@ use crate::{
     input_log::{input_log_add_wm_input, input_log_get_device},
     should_skip_input,
     win32hal::get_raw_input_data,
-    RekeyError,
+    RekeyError, SkipInput,
 };
 
 pub fn message_loop() -> Result<(), RekeyError> {
@@ -112,7 +112,7 @@ fn handle_should_skip_input(
     }
 
     let result = should_skip_input(vkey_code, direction, device)?;
-    if result {
+    if result == SkipInput::Skip {
         return Result::Ok(SKIP_INPUT);
     } else {
         return Result::Ok(DONT_SKIP_INPUT);

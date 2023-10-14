@@ -115,11 +115,6 @@ pub extern "C" fn keyboard_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LR
 }
 
 fn _keyboard_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> Result<LRESULT, RekeyError> {
-    debug(format!(
-        "keyboard_hook {}, {}, {}",
-        code, wparam.0, lparam.0
-    ));
-
     let mut data = MY_DATA
         .lock()
         .map_err(|err| RekeyError::GenericError(format!("could not get data lock: {}", err)))?;
