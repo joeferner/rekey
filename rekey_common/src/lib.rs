@@ -74,6 +74,13 @@ pub fn debug<S>(s: S) -> ()
 where
     S: Into<String>,
 {
+    let now = Local::now();
+    let s = s.into();
+
+    if cfg!(debug_assertions) {
+        println!("{}: {}", now.format("%F %X"), s);
+    }
+
     if let Result::Ok(filename) = get_log_filename() {
         let file = OpenOptions::new()
             .create(true)
@@ -81,8 +88,7 @@ where
             .append(true)
             .open(filename);
         if let Result::Ok(mut f) = file {
-            let now = Local::now();
-            let _ = writeln!(&mut f, "{}: {}", now.format("%F %X"), s.into()).is_ok();
+            let _ = writeln!(&mut f, "{}: {}", now.format("%F %X"), s).is_ok();
         }
     }
 }
