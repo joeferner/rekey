@@ -1,6 +1,6 @@
 use rekey_common::{
-    get_log_filename, KeyDirection, DONT_SKIP_INPUT, SKIP_INPUT, WM_USER_SHELL_ICON,
-    WM_USER_SHOULD_SKIP_INPUT, get_scripts_dir,
+    get_log_filename, get_scripts_dir, KeyDirection, DONT_SKIP_INPUT, SKIP_INPUT,
+    WM_USER_SHELL_ICON, WM_USER_SHOULD_SKIP_INPUT,
 };
 use std::mem::size_of;
 use windows::{
@@ -16,13 +16,13 @@ use windows::{
             },
             WindowsAndMessaging::{
                 CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
-                GetCursorPos, GetMessageW, InsertMenuW, LoadCursorW, LoadIconW, PostMessageW,
-                PostQuitMessage, RegisterClassExW, TrackPopupMenu, TranslateMessage, IDC_ARROW,
-                MF_BYPOSITION, MF_STRING, MSG, SW_NORMAL, TPM_BOTTOMALIGN, TPM_LEFTALIGN,
-                TPM_LEFTBUTTON, WINDOW_EX_STYLE, WM_CLOSE, WM_COMMAND, WM_DESTROY, WM_INPUT,
-                WM_KEYDOWN, WM_KEYUP, WM_RBUTTONDOWN, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSEXW,
-                WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU,
-                WS_THICKFRAME,
+                GetCursorPos, GetMessageW, InsertMenuW, LoadCursorW, LoadIconW, MessageBoxW,
+                PostMessageW, PostQuitMessage, RegisterClassExW, TrackPopupMenu, TranslateMessage,
+                IDC_ARROW, MB_ICONEXCLAMATION, MB_RETRYCANCEL, MF_BYPOSITION, MF_STRING, MSG,
+                SW_NORMAL, TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_LEFTBUTTON, WINDOW_EX_STYLE,
+                WM_CLOSE, WM_COMMAND, WM_DESTROY, WM_INPUT, WM_KEYDOWN, WM_KEYUP, WM_RBUTTONDOWN,
+                WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSEXW, WS_CAPTION, WS_MAXIMIZEBOX,
+                WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_THICKFRAME, IDRETRY,
             },
         },
         UI::{
@@ -153,7 +153,7 @@ fn handle_menu_click(hwnd: HWND, wparam: WPARAM, _lparam: LPARAM) -> Result<LRES
             return Result::Ok(LRESULT(0));
         },
         ID_MENU_RELOAD_SCRIPTS => {
-            scripts_load()?;
+            load_scripts_notify_on_error(hwnd);
             return Result::Ok(LRESULT(0));
         }
         _ => {
@@ -388,5 +388,23 @@ pub fn create_window() -> Result<HWND, RekeyError> {
         );
 
         return Result::Ok(window);
+    }
+}
+
+pub fn load_scripts_notify_on_error(hwnd: HWND) -> () {
+    if let Result::Err(err) = scripts_load() {
+        unsafe {
+            let message = HSTRING::from(format!("{}", err));
+            let results = MessageBoxW(
+                hwnd,
+                &message,
+                w!("Error Loading Scripts"),
+                MB_ICONEXCLAMATION | MB_RETRYCANCEL,
+            );
+            if results == IDRETRY {
+                load_scripts_notify_on_error(hwnd);
+                return;
+            }
+        }
     }
 }

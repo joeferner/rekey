@@ -16,6 +16,7 @@ use crate::{devices::Device, js, SkipInput};
 #[derive(PartialEq, Eq)]
 enum KeyHandlerDevices {
     All,
+    Contains(String),
 }
 
 #[derive(PartialEq, Eq)]
@@ -70,7 +71,6 @@ pub fn scripts_load() -> Result<(), RekeyError> {
     let script_dir = get_scripts_dir()?;
     fs::create_dir_all(&script_dir)?;
 
-    *channel = Option::Some(tx);
     let (init_tx, init_rx) = mpsc::channel();
     thread::spawn(move || {
         scripts_thread(init_tx, rx, script_dir);
@@ -83,6 +83,7 @@ pub fn scripts_load() -> Result<(), RekeyError> {
         return Result::Err(err);
     }
 
+    *channel = Option::Some(tx);
     return Result::Ok(());
 }
 
@@ -155,10 +156,19 @@ fn thread_run_key_handler_callbacks(
     script: &Script,
     key_handler: &KeyHandler,
 ) -> ThreadResponseMessage {
-    if key_handler.keys != KeyHandlerKeys::All || key_handler.devices != KeyHandlerDevices::All {
-        return Result::Err(RekeyError::GenericError(
-            "unhandled keys/devices".to_string(),
-        ));
+    match key_handler.keys {
+        KeyHandlerKeys::All => {}
+    }
+
+    match &key_handler.devices {
+        KeyHandlerDevices::All => {}
+        KeyHandlerDevices::Contains(conains_str) => {
+            if let Option::Some(device) = &msg.device {
+                if !device.device_name.contains(conains_str) {
+                    return Result::Ok(SkipInput::DontSkip);
+                }
+            }
+        }
     }
 
     let mut context = script
@@ -216,6 +226,15 @@ fn load_scripts<'a>(script_dir: PathBuf) -> Result<Vec<Script<'a>>, RekeyError> 
     for entry in fs::read_dir(&script_dir)? {
         let entry = entry?;
         let entry_path = entry.path();
+        if entry_path
+            .extension()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default()
+            != "js"
+        {
+            continue;
+        }
         debug!("loading script: {}", entry_path.display());
 
         let mut context = Context::default();
@@ -294,19 +313,18 @@ fn handle_register(
             let devices = devices.as_string().unwrap().to_std_string_escaped();
             let keys = keys.as_string().unwrap().to_std_string_escaped();
             let callback = callback.as_callable().unwrap();
-            if devices != "*" {
-                return Result::Err(JsError::from(
-                    JsNativeError::error()
-                        .with_message("invalid devices arguments, expected \"*\""),
-                ));
-            }
             if keys != "*" {
                 return Result::Err(JsError::from(
                     JsNativeError::error().with_message("invalid keys arguments, expected \"*\""),
                 ));
             }
+            let devices = if devices == "*" {
+                KeyHandlerDevices::All
+            } else {
+                KeyHandlerDevices::Contains(devices)
+            };
             return Result::Ok(KeyHandler {
-                devices: KeyHandlerDevices::All,
+                devices,
                 keys: KeyHandlerKeys::All,
                 callback: callback.clone(),
             });

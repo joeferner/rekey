@@ -14,8 +14,10 @@ use std::fs;
 use dll::RekeyDll;
 use raw_input::RawInput;
 use rekey_common::{debug, get_log_filename, RekeyError};
-use scripts::scripts_load;
-use window::{add_systray_icon, create_window, delete_systray_icon, message_loop};
+use window::{
+    add_systray_icon, create_window, delete_systray_icon, load_scripts_notify_on_error,
+    message_loop,
+};
 
 fn main() {
     match _main() {
@@ -33,7 +35,7 @@ fn _main() -> Result<(), RekeyError> {
     let window = create_window()?;
     add_systray_icon(window)?;
 
-    scripts_load()?;
+    load_scripts_notify_on_error(window);
 
     let mut dll = RekeyDll::new()?;
     dll.install(window)?;
