@@ -1,20 +1,30 @@
-use rekey_common::{KeyDirection, DONT_SKIP_INPUT, SKIP_INPUT, WM_REKEY_SHOULD_SKIP_INPUT};
+use rekey_common::{
+    KeyDirection, DONT_SKIP_INPUT, SKIP_INPUT, WM_USER_SHELL_ICON, WM_USER_SHOULD_SKIP_INPUT,
+};
 use std::mem::size_of;
 use windows::{
     core::{w, PCWSTR},
     Win32::{
-        Foundation::{GetLastError, BOOL, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
+        Foundation::{GetLastError, BOOL, HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM},
         System::LibraryLoader::GetModuleHandleW,
-        UI::WindowsAndMessaging::{PeekMessageW, CW_USEDEFAULT, HMENU, PM_REMOVE},
         UI::{
             Input::RIM_TYPEKEYBOARD,
+            Shell::{
+                NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_DELETE, NOTIFYICONDATAW, NOTIFY_ICON_DATA_FLAGS,
+            },
             WindowsAndMessaging::{
-                CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW,
-                LoadCursorW, PostQuitMessage, RegisterClassExW, ShowWindow, TranslateMessage,
-                IDC_ARROW, MSG, SW_SHOW, WINDOW_EX_STYLE, WM_CLOSE, WM_DESTROY, WM_INPUT,
-                WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSEXW, WS_CAPTION,
+                CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
+                GetCursorPos, GetMessageW, InsertMenuW, LoadCursorW, LoadIconW, PostMessageW,
+                PostQuitMessage, RegisterClassExW, TrackPopupMenu, TranslateMessage, IDC_ARROW,
+                MF_BYPOSITION, MF_STRING, MSG, TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_LEFTBUTTON,
+                WINDOW_EX_STYLE, WM_CLOSE, WM_COMMAND, WM_DESTROY, WM_INPUT, WM_KEYDOWN, WM_KEYUP,
+                WM_RBUTTONDOWN, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSEXW, WS_CAPTION,
                 WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_THICKFRAME,
             },
+        },
+        UI::{
+            Shell::{Shell_NotifyIconW, NIM_ADD},
+            WindowsAndMessaging::{PeekMessageW, CW_USEDEFAULT, HMENU, PM_REMOVE},
         },
     },
 };
@@ -27,6 +37,10 @@ use crate::{
     win32hal::get_raw_input_data,
     RekeyError, SkipInput,
 };
+
+const SYS_TRAY_ID: u32 = 1001;
+
+const ID_MENU_EXIT: usize = 1;
 
 pub fn message_loop() -> Result<(), RekeyError> {
     unsafe {
@@ -85,13 +99,79 @@ fn window_proc(
         WM_INPUT => {
             return handle_wm_input(hwnd, msg, wparam, lparam);
         }
-        WM_REKEY_SHOULD_SKIP_INPUT => {
+        WM_USER_SHOULD_SKIP_INPUT => {
             return handle_should_skip_input(hwnd, wparam, lparam);
+        }
+        WM_USER_SHELL_ICON => {
+            return handle_shell_icon(hwnd, wparam, lparam);
+        }
+        WM_COMMAND => {
+            return handle_menu_click(hwnd, wparam, lparam);
         }
         _ => unsafe {
             return Result::Ok(DefWindowProcW(hwnd, msg, wparam, lparam));
         },
     }
+}
+
+fn handle_menu_click(hwnd: HWND, wparam: WPARAM, _lparam: LPARAM) -> Result<LRESULT, RekeyError> {
+    match wparam.0 {
+        ID_MENU_EXIT => unsafe {
+            PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)).map_err(|err| {
+                RekeyError::GenericError(format!("failed to close window: {}", err))
+            })?;
+            return Result::Ok(LRESULT(0));
+        },
+        _ => {
+            return Result::Ok(LRESULT(0));
+        }
+    }
+}
+
+fn handle_shell_icon(hwnd: HWND, _wparam: WPARAM, lparam: LPARAM) -> Result<LRESULT, RekeyError> {
+    let msg = (lparam.0 & 0xffff) as u32;
+    match msg {
+        WM_RBUTTONDOWN => {
+            return handle_shell_icon_right_click(hwnd);
+        }
+        _ => {
+            return Result::Ok(LRESULT(0));
+        }
+    }
+}
+
+fn handle_shell_icon_right_click(hwnd: HWND) -> Result<LRESULT, RekeyError> {
+    unsafe {
+        let mut click_point = POINT::default();
+        GetCursorPos(&mut click_point).map_err(|err| {
+            RekeyError::GenericError(format!("failed to get cursor pos: {}", err))
+        })?;
+
+        let menu = CreatePopupMenu().map_err(|err| {
+            RekeyError::GenericError(format!("failed to create popup menu: {}", err))
+        })?;
+
+        InsertMenuW(
+            menu,
+            0xFFFFFFFF,
+            MF_BYPOSITION | MF_STRING,
+            ID_MENU_EXIT,
+            w!("Exit"),
+        )
+        .map_err(|err| RekeyError::GenericError(format!("failed to insert menu item: {}", err)))?;
+
+        TrackPopupMenu(
+            menu,
+            TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_BOTTOMALIGN,
+            click_point.x,
+            click_point.y,
+            0,
+            hwnd,
+            Option::None,
+        )
+        .map_err(|err| RekeyError::GenericError(format!("failed to track popup menu: {}", err)))?;
+    }
+    return Result::Ok(LRESULT(0));
 }
 
 fn handle_should_skip_input(
@@ -152,17 +232,70 @@ fn handle_wm_input(
     }
 }
 
-pub fn create_window() -> Result<HWND, RekeyError> {
+fn get_hinstance() -> Result<HINSTANCE, RekeyError> {
     unsafe {
         let instance = GetModuleHandleW(PCWSTR::null())
             .map_err(|err| RekeyError::Win32Error("failed GetModuleHandleW".to_string(), err))?;
+        return Result::Ok(HINSTANCE(instance.0));
+    }
+}
 
+pub fn add_systray_icon(hwnd: HWND) -> Result<(), RekeyError> {
+    unsafe {
+        let hinstance = get_hinstance()?;
+
+        let mut tray_tooltip = [0; 128];
+        let tray_tooltip_w = w!("ReKey");
+        let tray_tooltip_wide = tray_tooltip_w.as_wide();
+        tray_tooltip[..tray_tooltip_wide.len()].copy_from_slice(&tray_tooltip_wide);
+
+        let main_icon = LoadIconW(hinstance, w!("ICON_REKEY"))
+            .map_err(|err| RekeyError::GenericError(format!("failed to load icon: {}", err)))?;
+
+        let mut notify_icon_data = NOTIFYICONDATAW::default();
+        notify_icon_data.cbSize = size_of::<NOTIFYICONDATAW>() as u32;
+        notify_icon_data.hWnd = hwnd;
+        notify_icon_data.uID = SYS_TRAY_ID;
+        notify_icon_data.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+        notify_icon_data.hIcon = main_icon;
+        notify_icon_data.uCallbackMessage = WM_USER_SHELL_ICON;
+        notify_icon_data.szTip = tray_tooltip;
+        if !Shell_NotifyIconW(NIM_ADD, &notify_icon_data).as_bool() {
+            return Result::Err(RekeyError::GenericError(
+                "failed Shell_NotifyIcon".to_string(),
+            ));
+        }
+
+        return Result::Ok(());
+    }
+}
+
+pub fn delete_systray_icon(hwnd: HWND) -> Result<(), RekeyError> {
+    unsafe {
+        let mut notify_icon_data = NOTIFYICONDATAW::default();
+        notify_icon_data.cbSize = size_of::<NOTIFYICONDATAW>() as u32;
+        notify_icon_data.hWnd = hwnd;
+        notify_icon_data.uID = SYS_TRAY_ID;
+        notify_icon_data.uFlags = NOTIFY_ICON_DATA_FLAGS(0);
+        if !Shell_NotifyIconW(NIM_DELETE, &notify_icon_data).as_bool() {
+            return Result::Err(RekeyError::GenericError(
+                "failed delete Shell_NotifyIcon".to_string(),
+            ));
+        }
+
+        return Result::Ok(());
+    }
+}
+
+pub fn create_window() -> Result<HWND, RekeyError> {
+    unsafe {
+        let hinstance = get_hinstance()?;
         let window_class_name = w!("rekey");
 
         let mut wnd_class = WNDCLASSEXW::default();
         wnd_class.cbSize = size_of::<WNDCLASSEXW>() as u32;
         wnd_class.lpfnWndProc = Option::Some(window_proc_system);
-        wnd_class.hInstance = HINSTANCE::from(instance);
+        wnd_class.hInstance = hinstance;
         wnd_class.lpszClassName = window_class_name;
         wnd_class.hCursor = LoadCursorW(HINSTANCE::default(), IDC_ARROW)
             .map_err(|e| RekeyError::Win32Error("LoadCursorW".to_string(), e))?;
@@ -189,11 +322,9 @@ pub fn create_window() -> Result<HWND, RekeyError> {
             CW_USEDEFAULT,
             HWND(0),
             HMENU(0),
-            instance,
+            hinstance,
             Option::None,
         );
-
-        ShowWindow(window, SW_SHOW);
 
         return Result::Ok(window);
     }

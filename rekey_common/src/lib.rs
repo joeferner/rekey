@@ -3,7 +3,8 @@ use directories::ProjectDirs;
 use std::{fmt, fs::OpenOptions, io::Write, path::PathBuf};
 use windows::Win32::{Foundation::LRESULT, UI::WindowsAndMessaging::WM_USER};
 
-pub const WM_REKEY_SHOULD_SKIP_INPUT: u32 = WM_USER + 300;
+pub const WM_USER_SHOULD_SKIP_INPUT: u32 = WM_USER + 300;
+pub const WM_USER_SHELL_ICON: u32 = WM_USER + 301;
 pub const DONT_SKIP_INPUT: LRESULT = LRESULT(1);
 pub const SKIP_INPUT: LRESULT = LRESULT(42);
 

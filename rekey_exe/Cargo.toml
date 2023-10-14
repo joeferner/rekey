@@ -2,6 +2,10 @@
 name = "rekey"
 version = "0.1.0"
 edition = "2021"
+build = "build.rs"
+
+[build-dependencies]
+winres = "0.1.12"
 
 [dependencies]
 boa_engine = "0.17.3"
@@ -17,6 +21,7 @@ features = [
   "Win32_System_LibraryLoader",
   "Win32_UI_WindowsAndMessaging",
   "Win32_UI_Input",
+  "Win32_UI_Shell",
   "Win32_System_Threading",
   "Win32_Graphics_Gdi",
 ]

@@ -16,7 +16,7 @@ use dll::RekeyDll;
 use raw_input::RawInput;
 use rekey_common::{debug, get_log_filename, KeyDirection, RekeyError};
 use scripts::{scripts_handle_input, scripts_load};
-use window::{create_window, message_loop};
+use window::{add_systray_icon, create_window, message_loop, delete_systray_icon};
 
 fn main() {
     match _main() {
@@ -32,6 +32,7 @@ fn _main() -> Result<(), RekeyError> {
     debug("BEGIN");
 
     let window = create_window()?;
+    add_systray_icon(window)?;
 
     scripts_load()?;
 
@@ -44,6 +45,7 @@ fn _main() -> Result<(), RekeyError> {
 
     dll.uninstall()?;
     raw_input.uninstall()?;
+    delete_systray_icon(window)?;
 
     debug("END");
     return Result::Ok(());

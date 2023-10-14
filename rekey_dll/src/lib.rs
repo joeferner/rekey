@@ -6,7 +6,7 @@ use std::{
     sync::Mutex,
 };
 
-use rekey_common::{debug, RekeyError, SKIP_INPUT, WM_REKEY_SHOULD_SKIP_INPUT};
+use rekey_common::{debug, RekeyError, SKIP_INPUT, WM_USER_SHOULD_SKIP_INPUT};
 use windows::{
     core::s,
     Win32::{
@@ -130,7 +130,7 @@ fn _keyboard_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> Result<LRESULT, 
                 return Result::Ok(CallNextHookEx(d.hhook, code, wparam, lparam));
             }
 
-            let result = SendMessageW(d.hwnd, WM_REKEY_SHOULD_SKIP_INPUT, wparam, lparam);
+            let result = SendMessageW(d.hwnd, WM_USER_SHOULD_SKIP_INPUT, wparam, lparam);
             if result == SKIP_INPUT {
                 return Result::Ok(LRESULT(1));
             }
