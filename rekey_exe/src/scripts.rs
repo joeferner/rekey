@@ -167,9 +167,9 @@ fn thread_run_key_handler_callbacks(
 
     match &key_handler.devices {
         KeyHandlerDevices::All => {}
-        KeyHandlerDevices::Contains(conains_str) => {
+        KeyHandlerDevices::Contains(contains_str) => {
             if let Option::Some(device) = &msg.device {
-                if !device.device_name.contains(conains_str) {
+                if !device.device_name.contains(contains_str) {
                     return Result::Ok(SkipInput::DontSkip);
                 }
             }
@@ -314,81 +314,99 @@ fn handle_send_key(
     args: &[JsValue],
     _context: &mut Context<'_>,
 ) -> Result<JsValue, JsError> {
-    if args.len() == 1 {
-        let arg0 = args.get(0).unwrap();
-        if arg0.is_string() {
-            let key_expr = arg0.as_string().unwrap().to_std_string_escaped();
+    if args.len() != 1 && args.len() != 2 {
+        return Result::Err(JsError::from(JsNativeError::error().with_message(
+            format!("invalid number of arguments, expected sendKey(expr: string, direction?: 'up' | 'down') found {}",args.len())
+        )));
+    }
 
-            let mut inputs: Vec<INPUT> = vec![];
-
-            fn add_key_to_input(
-                inputs: &mut Vec<INPUT>,
-                key_expr_part: &str,
-                up: bool,
-            ) -> Result<(), JsError> {
-                let r =
-                    to_virtual_key(key_expr_part).map_err(|err| {
-                        JsError::from(JsNativeError::error().with_message(format!(
-                            "could not covert key {}: {}",
-                            key_expr_part, err
-                        )))
-                    })?;
-
-                if up {
-                    inputs.push(create_input(r.vkey, true));
-                }
-                if r.ctrl {
-                    inputs.push(create_input(VK_CONTROL, up));
-                }
-                if r.alt {
-                    inputs.push(create_input(VK_MENU, up));
-                }
-                if r.shift {
-                    inputs.push(create_input(VK_SHIFT, up));
-                }
-                if r.hankaku {
-                    return Result::Err(JsError::from(
-                        JsNativeError::error().with_message("could not handle hankaku"),
-                    ));
-                }
-                if !up {
-                    inputs.push(create_input(r.vkey, false));
-                }
-                return Result::Ok(());
-            }
-
-            let key_expr_parts: Vec<&str> = key_expr.split("+").collect();
-            for key_expr_part in &key_expr_parts {
-                add_key_to_input(&mut inputs, key_expr_part, false)?;
-            }
-
-            let key_expr_parts_rev: Vec<&str> = key_expr_parts.iter().copied().rev().collect();
-            for key_expr_part in key_expr_parts_rev {
-                add_key_to_input(&mut inputs, key_expr_part, true)?;
-            }
-
-            let cbsize = size_of::<INPUT>();
-            unsafe {
-                let r = SendInput(&inputs, cbsize as i32) as usize;
-                if r != inputs.len() {
-                    return Result::Err(JsError::from(
-                        JsNativeError::error().with_message("failed to send all inputs"),
-                    ));
-                }
-            }
-
-            return Result::Ok(JsValue::Undefined);
-        } else {
-            return Result::Err(JsError::from(
-                JsNativeError::error().with_message("invalid arguments, expected sendKey(string)"),
-            ));
-        }
-    } else {
+    let arg0 = args.get(0).unwrap();
+    if !arg0.is_string() {
         return Result::Err(JsError::from(JsNativeError::error().with_message(format!(
-            "invalid arguments, expected 1 found {}",
-            args.len()
+            "invalid first argument, expected sendKey(expr: string, direction?: 'up' | 'down')"
         ))));
     }
+
+    let mut key_direction = "both".to_string();
+    if args.len() == 2 {
+        let arg1 = args.get(1).unwrap();
+        if !arg1.is_string() {
+            return Result::Err(JsError::from(JsNativeError::error().with_message(format!(
+                "invalid second argument, expected sendKey(expr: string, direction?: 'up' | 'down')"
+            ))));
+        }
+        key_direction = arg1.as_string().unwrap().to_std_string_escaped();
+    }
+    if key_direction != "both" && key_direction != "up" && key_direction != "down" {
+        return Result::Err(JsError::from(JsNativeError::error().with_message(format!(
+            "invalid second argument, expected sendKey(expr: string, direction?: 'up' | 'down')"
+        ))));
+    }
+
+    let key_expr = arg0.as_string().unwrap().to_std_string_escaped();
+
+    let mut inputs: Vec<INPUT> = vec![];
+
+    fn add_key_to_input(
+        inputs: &mut Vec<INPUT>,
+        key_expr_part: &str,
+        up: bool,
+    ) -> Result<(), JsError> {
+        let r = to_virtual_key(key_expr_part).map_err(|err| {
+            JsError::from(
+                JsNativeError::error()
+                    .with_message(format!("could not covert key {}: {}", key_expr_part, err)),
+            )
+        })?;
+
+        if up {
+            inputs.push(create_input(r.vkey, true));
+        }
+        if r.ctrl {
+            inputs.push(create_input(VK_CONTROL, up));
+        }
+        if r.alt {
+            inputs.push(create_input(VK_MENU, up));
+        }
+        if r.shift {
+            inputs.push(create_input(VK_SHIFT, up));
+        }
+        if r.hankaku {
+            return Result::Err(JsError::from(
+                JsNativeError::error().with_message("could not handle hankaku"),
+            ));
+        }
+        if !up {
+            inputs.push(create_input(r.vkey, false));
+        }
+        return Result::Ok(());
+    }
+
+    let key_expr_parts: Vec<&str> = key_expr.split("+").collect();
+    if key_direction == "both" || key_direction == "down" {
+        for key_expr_part in &key_expr_parts {
+            add_key_to_input(&mut inputs, key_expr_part, false)?;
+        }
+    }
+
+    if key_direction == "both" || key_direction == "up" {
+        let key_expr_parts_rev: Vec<&str> = key_expr_parts.iter().copied().rev().collect();
+        for key_expr_part in key_expr_parts_rev {
+            add_key_to_input(&mut inputs, key_expr_part, true)?;
+        }
+    }
+
+    let input_size = size_of::<INPUT>();
+    unsafe {
+        let r = SendInput(&inputs, input_size as i32) as usize;
+        if r != inputs.len() {
+            return Result::Err(JsError::from(
+                JsNativeError::error().with_message("failed to send all inputs"),
+            ));
+        }
+    }
+
+    return Result::Ok(JsValue::Undefined);
 }
 
 fn create_input(vkey: VIRTUAL_KEY, up: bool) -> INPUT {
