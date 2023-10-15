@@ -1,7 +1,12 @@
 
 rekeyRegister("PID_026C", "*", ctx => {
-  if (ctx.vKeyCode == 144) {
+  if (ctx.vKeyCode == VK_1) {
 	  sendKey("ctrl+esc", ctx.direction);
   }
-  return false;
+  return true;
+});
+
+rekeyRegister("unknown", "*", ctx => {
+  console.log(ctx.vKeyCode);
+  return true;
 });

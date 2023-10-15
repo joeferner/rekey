@@ -37,7 +37,7 @@ pub fn find_device(hdevice: HANDLE) -> Result<Arc<Device>, RekeyError> {
     // if all else fails create an unknown device and return that
     let device = Arc::new(Device {
         hdevice,
-        device_name: "Unknown".to_string(),
+        device_name: "unknown".to_string(),
     });
     devices.push(device.clone());
 

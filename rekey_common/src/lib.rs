@@ -1,13 +1,16 @@
 use chrono::Local;
 use directories::ProjectDirs;
 use std::{fmt, fs::OpenOptions, io::Write, path::PathBuf};
+use vkeys::VKEY_LOOKUP_BY_NAME;
 use windows::Win32::{
     Foundation::LRESULT,
     UI::{
-        Input::KeyboardAndMouse::{self, VkKeyScanW, VIRTUAL_KEY},
+        Input::KeyboardAndMouse::{VkKeyScanW, VIRTUAL_KEY},
         WindowsAndMessaging::WM_USER,
     },
 };
+
+pub mod vkeys;
 
 pub const WM_USER_SHOULD_SKIP_INPUT: u32 = WM_USER + 300;
 pub const WM_USER_SHELL_ICON: u32 = WM_USER + 301;
@@ -150,151 +153,31 @@ impl ToVirtualKeyResult {
 }
 
 pub fn to_virtual_key(s: &str) -> Result<ToVirtualKeyResult, RekeyError> {
-    let s = s.to_ascii_lowercase();
-    match s.as_str() {
-        "ctrl" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_CONTROL));
-        }
-        "alt" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_MENU));
-        }
-        "shift" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_SHIFT));
-        }
-        "win" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_LWIN));
-        }
-        "esc" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_ESCAPE));
-        }
-        "space" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_SPACE));
-        }
-        "backspace" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_BACK));
-        }
-        "tab" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_TAB));
-        }
-        "enter" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_RETURN));
-        }
-        "pause" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_PAUSE));
-        }
-        "left" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_LEFT));
-        }
-        "right" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_RIGHT));
-        }
-        "up" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_UP));
-        }
-        "down" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_DOWN));
-        }
-        "insert" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_INSERT));
-        }
-        "delete" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_DELETE));
-        }
-        "f1" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F1));
-        }
-        "f2" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F2));
-        }
-        "f3" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F3));
-        }
-        "f4" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F4));
-        }
-        "f5" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F5));
-        }
-        "f6" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F6));
-        }
-        "f7" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F7));
-        }
-        "f8" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F8));
-        }
-        "f9" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F9));
-        }
-        "f10" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F10));
-        }
-        "f11" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F11));
-        }
-        "f12" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F12));
-        }
-        "f13" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F13));
-        }
-        "f14" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F14));
-        }
-        "f15" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F15));
-        }
-        "f16" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F16));
-        }
-        "f17" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F17));
-        }
-        "f18" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F18));
-        }
-        "f19" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F19));
-        }
-        "f20" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F20));
-        }
-        "f21" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F21));
-        }
-        "f22" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F22));
-        }
-        "f23" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F23));
-        }
-        "f24" => {
-            return Result::Ok(ToVirtualKeyResult::from_vkey(KeyboardAndMouse::VK_F23));
-        }
-        _ => {
-            if s.len() == 1 {
-                if let Option::Some(ch) = s.chars().next() {
-                    let r = unsafe { VkKeyScanW(ch as u16) as u16 };
-                    let low = (r & 0xff) as i8;
-                    let high = ((r >> 8) & 0xff) as i8;
-                    if low >= 0 && high >= 0 {
-                        let vkey = VIRTUAL_KEY(low as u16);
-                        return Result::Ok(ToVirtualKeyResult {
-                            vkey,
-                            shift: high & 1 == 1,
-                            ctrl: high & 2 == 2,
-                            alt: high & 4 == 4,
-                            hankaku: high & 8 == 8,
-                        });
-                    }
-                }
-            }
+    if let Option::Some(lookup_value) = VKEY_LOOKUP_BY_NAME.get(s.to_ascii_lowercase().as_str()) {
+        return Result::Ok(ToVirtualKeyResult::from_vkey(lookup_value.code));
+    }
 
-            return Result::Err(RekeyError::GenericError(format!(
-                "could not convert key {} to virtual key",
-                s
-            )));
+    let s = s.to_ascii_lowercase();
+    if s.len() == 1 {
+        if let Option::Some(ch) = s.chars().next() {
+            let r = unsafe { VkKeyScanW(ch as u16) as u16 };
+            let low = (r & 0xff) as i8;
+            let high = ((r >> 8) & 0xff) as i8;
+            if low >= 0 && high >= 0 {
+                let vkey = VIRTUAL_KEY(low as u16);
+                return Result::Ok(ToVirtualKeyResult {
+                    vkey,
+                    shift: high & 1 == 1,
+                    ctrl: high & 2 == 2,
+                    alt: high & 4 == 4,
+                    hankaku: high & 8 == 8,
+                });
+            }
         }
-    };
+    }
+
+    return Result::Err(RekeyError::GenericError(format!(
+        "could not convert key {} to virtual key",
+        s
+    )));
 }

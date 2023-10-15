@@ -3,7 +3,11 @@ use boa_engine::{
     NativeFunction, Source,
 };
 use lazy_static::lazy_static;
-use rekey_common::{debug, get_scripts_dir, to_virtual_key, KeyDirection, RekeyError};
+use rekey_common::{
+    debug, get_scripts_dir, to_virtual_key,
+    vkeys::{VKEY_LOOKUP_BY_CODE, VKEY_LOOKUP_BY_NAME},
+    KeyDirection, RekeyError,
+};
 use std::{
     fs,
     mem::size_of,
@@ -194,6 +198,16 @@ fn thread_run_key_handler_callbacks(
     )
     .map_err(|err| RekeyError::GenericError(format!("failed to set: {}", err)))?;
 
+    if let Option::Some(key) = VKEY_LOOKUP_BY_CODE.get(&msg.vkey_code) {
+        ctx.set(
+            js_string!("key"),
+            JsValue::from(key.name.to_string()),
+            false,
+            &mut context,
+        )
+        .map_err(|err| RekeyError::GenericError(format!("failed to set: {}", err)))?;
+    }
+
     ctx.set(
         js_string!("direction"),
         JsValue::from(js_string!(direction)),
@@ -276,6 +290,19 @@ fn initialize_context(
             Attribute::all(),
         )
         .map_err(|err| RekeyError::GenericError(format!("failed to register console: {}", err)))?;
+
+    for vkey in VKEY_LOOKUP_BY_NAME.values() {
+        let name = format!("VK_{}", vkey.name.to_ascii_uppercase());
+        context
+            .register_global_property(
+                js_string!(name),
+                JsValue::Integer(vkey.code.0 as i32),
+                Attribute::all(),
+            )
+            .map_err(|err| {
+                RekeyError::GenericError(format!("failed to register console: {}", err))
+            })?;
+    }
 
     context
         .register_global_callable("rekeyRegister", 0, unsafe {
