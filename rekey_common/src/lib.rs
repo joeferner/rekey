@@ -16,6 +16,7 @@ pub const WM_USER_SHOULD_SKIP_INPUT: u32 = WM_USER + 300;
 pub const WM_USER_SHELL_ICON: u32 = WM_USER + 301;
 pub const DONT_SKIP_INPUT: LRESULT = LRESULT(1);
 pub const SKIP_INPUT: LRESULT = LRESULT(42);
+pub const REKEY_API_JS_FILENAME: &str = "rekey-api.js";
 
 #[derive(Debug)]
 pub enum RekeyError {

@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 use rekey_common::{
     debug, get_scripts_dir, to_virtual_key,
     vkeys::{VKEY_LOOKUP_BY_CODE, VKEY_LOOKUP_BY_NAME},
-    KeyDirection, RekeyError,
+    KeyDirection, RekeyError, REKEY_API_JS_FILENAME,
 };
 use std::{
     fs,
@@ -79,6 +79,10 @@ pub fn scripts_load() -> Result<(), RekeyError> {
 
     let script_dir = get_scripts_dir()?;
     fs::create_dir_all(&script_dir)?;
+
+    let rekey_api_js_file = script_dir.join(REKEY_API_JS_FILENAME);
+    let rekey_api_js_contents = include_str!("../target/generated/rekey-api.js");
+    fs::write(rekey_api_js_file, rekey_api_js_contents)?;
 
     let (init_tx, init_rx) = mpsc::channel();
     thread::spawn(move || {

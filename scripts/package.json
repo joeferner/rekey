@@ -1,0 +1,12 @@
+{
+  "name": "rekey-scripts",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "generate-api": "jsdoc --configure jsdoc.json"
+  },
+  "dependencies": {
+    "docdash": "^2.0.2",
+    "jsdoc": "^4.0.2"
+  }
+}

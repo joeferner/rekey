@@ -18,11 +18,11 @@ use windows::{
                 CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
                 GetCursorPos, GetMessageW, InsertMenuW, LoadCursorW, LoadIconW, MessageBoxW,
                 PostMessageW, PostQuitMessage, RegisterClassExW, TrackPopupMenu, TranslateMessage,
-                IDC_ARROW, MB_ICONEXCLAMATION, MB_RETRYCANCEL, MF_BYPOSITION, MF_STRING, MSG,
-                SW_NORMAL, TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_LEFTBUTTON, WINDOW_EX_STYLE,
+                IDC_ARROW, IDRETRY, MB_ICONEXCLAMATION, MB_RETRYCANCEL, MF_BYPOSITION, MF_STRING,
+                MSG, SW_NORMAL, TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_LEFTBUTTON, WINDOW_EX_STYLE,
                 WM_CLOSE, WM_COMMAND, WM_DESTROY, WM_INPUT, WM_KEYDOWN, WM_KEYUP, WM_RBUTTONDOWN,
                 WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSEXW, WS_CAPTION, WS_MAXIMIZEBOX,
-                WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_THICKFRAME, IDRETRY,
+                WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_THICKFRAME,
             },
         },
         UI::{
@@ -402,8 +402,7 @@ pub fn load_scripts_notify_on_error(hwnd: HWND) -> () {
                 MB_ICONEXCLAMATION | MB_RETRYCANCEL,
             );
             if results == IDRETRY {
-                load_scripts_notify_on_error(hwnd);
-                return;
+                return load_scripts_notify_on_error(hwnd);
             }
         }
     }
