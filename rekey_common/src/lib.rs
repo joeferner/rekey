@@ -5,7 +5,7 @@ use vkeys::VKEY_LOOKUP_BY_NAME;
 use windows::Win32::{
     Foundation::LRESULT,
     UI::{
-        Input::KeyboardAndMouse::{VkKeyScanW, VIRTUAL_KEY},
+        Input::KeyboardAndMouse::{VkKeyScanW, VIRTUAL_KEY, VK_0, VK_9, VK_NUMPAD0, VK_NUMPAD9, VK_Z, VK_A},
         WindowsAndMessaging::WM_USER,
     },
 };
@@ -181,4 +181,17 @@ pub fn to_virtual_key(s: &str) -> Result<ToVirtualKeyResult, RekeyError> {
         "could not convert key {} to virtual key",
         s
     )));
+}
+
+pub fn char_from_vcode(vkey_code: u16) -> Option<char> {
+    if vkey_code >= VK_0.0 && vkey_code <= VK_9.0 {
+        return char::from_u32(('0' as u32) + (vkey_code - VK_0.0) as u32);
+    }
+    if vkey_code >= VK_NUMPAD0.0 && vkey_code <= VK_NUMPAD9.0 {
+        return char::from_u32(('0' as u32) + (vkey_code - VK_NUMPAD0.0) as u32);
+    }
+    if vkey_code >= VK_A.0 && vkey_code <= VK_Z.0 {
+        return char::from_u32(('a' as u32) + (vkey_code - VK_A.0) as u32);
+    }
+    return Option::None;
 }

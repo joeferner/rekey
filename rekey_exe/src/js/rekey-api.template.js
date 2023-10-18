@@ -12,7 +12,6 @@
  *                                  device name contains that string the callback will be called.
  * @param {'*'} keyFilter Currently must be '*' and no key filtering will be done.
  * @param {keyCallback} callback Callback to be called on each key event
- * @global
  */
 function rekeyRegister(deviceFilter, keyFilter, callback) {}
 
@@ -29,11 +28,23 @@ function rekeyRegister(deviceFilter, keyFilter, callback) {}
 function sendKey(keyExpression, direction) {}
 
 /**
+ * Get the state of a key
+ * 
+ * @global
+ * @function
+ * @name getKeyState
+ * @param {number} vKeyCode The virtual key code
+ * @returns {GetKeyStateResult}
+ */
+function getKeyState(vKeyCode) {}
+
+/**
  * Data passed to the rekeyRegister callback.
  * 
  * @typedef {Object} KeyData
  * @property {number} vKeyCode Virtual key code
  * @property {string} [key] String representation of the key.
+ * @property {string} [ch] String representation of the key.
  * @property {'up'|'down'} direction The direction of the key event
  * @property {string} [deviceName] The device name from which the event was generated.
  */
@@ -44,5 +55,11 @@ function sendKey(keyExpression, direction) {}
  * @returns {boolean} true, if the keyboard event should be filtered. false, if the keyboard event should not be filterd.
  */
 
-
+/**
+ * The results from getKeyState
+ * 
+ * @typedef {Object} GetKeyStateResult
+ * @property {'down'|'up'} state The current pressed state
+ * @property {boolean} toggled True if the key is toggled on i.e. caps lock
+ */
 

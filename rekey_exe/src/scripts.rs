@@ -4,7 +4,7 @@ use boa_engine::{
 };
 use lazy_static::lazy_static;
 use rekey_common::{
-    debug, get_scripts_dir, to_virtual_key,
+    char_from_vcode, debug, get_scripts_dir, to_virtual_key,
     vkeys::{VKEY_LOOKUP_BY_CODE, VKEY_LOOKUP_BY_NAME},
     KeyDirection, RekeyError, REKEY_API_JS_FILENAME,
 };
@@ -16,8 +16,8 @@ use std::{
     thread,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY,
-    VK_CONTROL, VK_MENU, VK_SHIFT,
+    GetKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
+    VIRTUAL_KEY, VK_CONTROL, VK_MENU, VK_SHIFT,
 };
 
 use crate::{devices::Device, js, SkipInput};
@@ -212,6 +212,11 @@ fn thread_run_key_handler_callbacks(
         .map_err(|err| RekeyError::GenericError(format!("failed to set: {}", err)))?;
     }
 
+    if let Option::Some(ch) = char_from_vcode(msg.vkey_code) {
+        ctx.set(js_string!("ch"), JsValue::from(ch), false, &mut context)
+            .map_err(|err| RekeyError::GenericError(format!("failed to set: {}", err)))?;
+    }
+
     ctx.set(
         js_string!("direction"),
         JsValue::from(js_string!(direction)),
@@ -333,11 +338,72 @@ fn initialize_context(
 
     context
         .register_global_callable("sendKey", 0, NativeFunction::from_fn_ptr(handle_send_key))
+        .map_err(|err| RekeyError::GenericError(format!("failed to register sendKey: {}", err)))?;
+
+    context
+        .register_global_callable(
+            "getKeyState",
+            0,
+            NativeFunction::from_fn_ptr(handle_get_key_state),
+        )
         .map_err(|err| {
-            RekeyError::GenericError(format!("failed to register rekeyRegister: {}", err))
+            RekeyError::GenericError(format!("failed to register getKeyState: {}", err))
         })?;
 
     return Result::Ok(());
+}
+
+fn handle_get_key_state(
+    _this: &JsValue,
+    args: &[JsValue],
+    context: &mut Context<'_>,
+) -> Result<JsValue, JsError> {
+    if args.len() != 1 {
+        return Result::Err(JsError::from(JsNativeError::error().with_message(format!(
+            "invalid number of arguments, expected getKeyState(vKeyCode: number) found {}",
+            args.len()
+        ))));
+    }
+
+    let arg0 = args.get(0).unwrap();
+    if !arg0.is_number() {
+        return Result::Err(JsError::from(JsNativeError::error().with_message(format!(
+            "invalid first argument, expected getKeyState(vKeyCode: number)"
+        ))));
+    }
+
+    let arg0 = arg0.to_uint16(context)?;
+    let key_state = unsafe { GetKeyState(arg0 as i32) as u32 };
+
+    let result = JsObject::default();
+
+    result
+        .set(
+            js_string!("state"),
+            JsValue::from(if (key_state & 0x8000) == 0x8000 {
+                "down"
+            } else {
+                "up"
+            }),
+            false,
+            context,
+        )
+        .map_err(|err| {
+            JsError::from(JsNativeError::error().with_message(format!("failed to set {}", err)))
+        })?;
+
+    result
+        .set(
+            js_string!("toggled"),
+            JsValue::from((key_state & 1) == 1),
+            false,
+            context,
+        )
+        .map_err(|err| {
+            JsError::from(JsNativeError::error().with_message(format!("failed to set {}", err)))
+        })?;
+
+    return Result::Ok(JsValue::Object(result));
 }
 
 fn handle_send_key(
