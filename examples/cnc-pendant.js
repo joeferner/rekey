@@ -49,7 +49,7 @@ function handleKeyEvent(ctx) {
     return true;
   }
 
-  if (ctx.key) {
+  if (ctx.key && ctx.direction === 'down') {
     handleKey(ctx.key);
   }
   return true;
@@ -104,92 +104,164 @@ function handleAltCodes(ctx) {
 function handleKey(key) {
   switch (key) {
     // fn+calc
-    case '$': break;
+    case '$':
+      console.log('$');
+      break;
 
     // ( / €
-    case '(': break;
-    case '€': break;
+    case '(':
+      console.log('(');
+      break;
+    case '€':
+      console.log('€');
+      break;
 
     // ) / ¥
-    case ')': break;
-    case '¥': break;
+    case ')':
+      console.log(')');
+      break;
+    case '¥':
+      console.log('¥');
+      break;
 
     // backspace
-    case 'backspace': break;
+    case 'backspace':
+      console.log('backspace');
+      break;
 
     // esc
-    case 'esc': break;
+    case 'esc':
+      console.log('esc');
+      break;
 
     // /
-    case 'divide': break;
+    case 'divide':
+      console.log('divide');
+      break;
 
     // *
-    case 'multiply': break;
+    case 'multiply':
+      console.log('multiply');
+      break;
 
     // - / nl(subtract)
     case 'subtract':
       if (getKeyState(VK_NUM_LOCK).toggled) {
+        console.log('subtract');
       } else {
+        console.log('nl(subtract)');
       }
       break;
 
     // =
-    case '=': break;
+    case '=':
+      console.log('=');
+      break;
 
     // 7 / home
-    case '7': case 'numpad7': break;
-    case 'home': break;
+    case '7': case 'numpad7':
+      console.log('7');
+      break;
+    case 'home':
+      console.log('home');
+      break;
 
     // 8 / up
-    case '8': case 'numpad8': break;
-    case 'up': break;
+    case '8': case 'numpad8':
+      console.log('8');
+      break;
+    case 'up':
+      console.log('up');
+      break;
 
     // 9 / page_up
-    case '9': case 'numpad9': break;
-    case 'page_up': break;
+    case '9': case 'numpad9':
+      console.log('9');
+      break;
+    case 'page_up':
+      console.log('page up');
+      break;
 
     // add
-    case 'add': break;
+    case 'add':
+      console.log('add');
+      break;
 
     // tab
-    case 'tab': break;
+    case 'tab':
+      console.log('tab');
+      break;
 
     // 4 / left
-    case '4': case 'numpad4': break;
-    case 'left': break;
+    case '4': case 'numpad4':
+      console.log('4');
+      break;
+    case 'left':
+      console.log('left');
+      break;
 
     // 5 / clear
-    case '5': case 'numpad5': break;
-    case 'clear': break;
+    case '5': case 'numpad5':
+      console.log('5');
+      break;
+    case 'clear':
+      console.log('clear');
+      break;
 
     // 6 / right
-    case '6': case 'numpad6': break;
-    case 'right': break;
+    case '6': case 'numpad6':
+      console.log('6');
+      break;
+    case 'right':
+      console.log('right');
+      break;
 
     // TODO 00
 
     // 1 / end
-    case '1': case 'numpad1': break;
-    case 'end': break;
+    case '1': case 'numpad1':
+      console.log('1');
+      break;
+    case 'end':
+      console.log('end');
+      break;
 
     // 2 / down
-    case '2': case 'numpad2': break;
-    case 'down': break;
+    case '2': case 'numpad2':
+      console.log('2');
+      break;
+    case 'down':
+      console.log('down');
+      break;
 
     // 3 / page_down
-    case '3': case 'numpad3': break;
-    case 'page_down': break;
+    case '3': case 'numpad3':
+      console.log('3');
+      break;
+    case 'page_down':
+      console.log('page down');
+      break;
 
     // enter
-    case 'enter': break;
+    case 'enter':
+      console.log('enter');
+      break;
 
     // 0 / insert
-    case '0': case 'numpad0': break;
-    case 'insert': break;
+    case '0': case 'numpad0':
+      console.log('0');
+      break;
+    case 'insert':
+      console.log('insert');
+      break;
 
     // decimal / delete
-    case 'decimal': break;
-    case 'delete': break;
+    case 'decimal':
+      console.log('.');
+      break;
+    case 'delete':
+      console.log('delete');
+      break;
 
     // ignore
     case 'num_lock': break;
