@@ -12,7 +12,10 @@ use std::{
     fs,
     mem::size_of,
     path::PathBuf,
-    sync::{mpsc, Arc, Mutex},
+    sync::{
+        mpsc::{self, RecvTimeoutError},
+        Arc, Mutex,
+    },
     thread,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -20,7 +23,11 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     VIRTUAL_KEY, VK_CONTROL, VK_MENU, VK_SHIFT,
 };
 
-use crate::{devices::Device, js, SkipInput};
+use crate::{
+    devices::Device,
+    js::{self, timer::Timer},
+    SkipInput,
+};
 
 #[derive(PartialEq, Eq)]
 enum KeyHandlerDevices {
@@ -39,9 +46,10 @@ struct KeyHandler {
     callback: JsObject,
 }
 
-struct Script<'a> {
-    context: Arc<Mutex<Context<'a>>>,
+pub struct Script<'a> {
+    pub context: Arc<Mutex<Context<'a>>>,
     key_handlers: Arc<Mutex<Vec<KeyHandler>>>,
+    pub timers: Arc<Mutex<Vec<Timer>>>,
 }
 
 struct InputMessage {
@@ -119,22 +127,49 @@ fn scripts_thread(
         .unwrap_or_else(|err| debug!("failed to send init: {}", err));
 
     loop {
-        match rx.recv() {
+        let timeout = Timer::get_nearest_duration(&scripts).unwrap_or_else(|err| {
+            debug!("failed to get nearest duration: {}", err);
+            return Option::None;
+        });
+        let msg = if let Option::Some(d) = timeout {
+            rx.recv_timeout(d)
+                .map_or_else(
+                    |err| match err {
+                        RecvTimeoutError::Timeout => Result::Ok(Option::None),
+                        RecvTimeoutError::Disconnected => Result::Err(err),
+                    },
+                    |v| Result::Ok(Option::Some(v)),
+                )
+                .map_err(|err| RekeyError::GenericError(format!("failed to recv {}", err)))
+        } else {
+            rx.recv()
+                .map_err(|err| RekeyError::GenericError(format!("failed to recv {}", err)))
+                .and_then(|x| Result::Ok(Option::Some(x)))
+        };
+        match msg {
             Result::Err(_err) => {
                 break;
             }
-            Result::Ok(msg) => match msg {
-                ThreadMessage::Exit => {
-                    break;
+            Result::Ok(msg) => {
+                if let Option::Some(msg) = msg {
+                    match msg {
+                        ThreadMessage::Exit => {
+                            break;
+                        }
+                        ThreadMessage::HandleInput(tx, msg) => {
+                            tx.send(thread_handle_input_message(msg, &scripts))
+                                .unwrap_or_else(|err| {
+                                    debug!("failed to send message: {}", err);
+                                    return ();
+                                });
+                        }
+                    }
                 }
-                ThreadMessage::HandleInput(tx, msg) => {
-                    tx.send(thread_handle_input_message(msg, &scripts))
-                        .unwrap_or_else(|err| {
-                            debug!("failed to send message: {}", err);
-                            return ();
-                        });
-                }
-            },
+                Timer::run_timers(&scripts).unwrap_or_else(|err| {
+                    debug!("failed to run timers: {}", err);
+                    return ();
+                });
+            }
         }
     }
     debug("script thread stopped");
@@ -267,7 +302,8 @@ fn load_scripts<'a>(script_dir: PathBuf) -> Result<Vec<Script<'a>>, RekeyError> 
 
         let mut context = Context::default();
         let key_handlers: Arc<Mutex<Vec<KeyHandler>>> = Arc::new(Mutex::new(vec![]));
-        initialize_context(&mut context, &key_handlers)?;
+        let timers: Arc<Mutex<Vec<Timer>>> = Arc::new(Mutex::new(vec![]));
+        initialize_context(&mut context, &key_handlers, &timers)?;
 
         let script_path = &entry_path.as_path();
         let source = Source::from_filepath(script_path)
@@ -282,6 +318,7 @@ fn load_scripts<'a>(script_dir: PathBuf) -> Result<Vec<Script<'a>>, RekeyError> 
         results.push(Script {
             context: Arc::new(Mutex::new(context)),
             key_handlers,
+            timers,
         });
     }
     return Result::Ok(results);
@@ -290,6 +327,7 @@ fn load_scripts<'a>(script_dir: PathBuf) -> Result<Vec<Script<'a>>, RekeyError> 
 fn initialize_context(
     context: &mut Context<'_>,
     key_handlers: &Arc<Mutex<Vec<KeyHandler>>>,
+    timers: &Arc<Mutex<Vec<Timer>>>,
 ) -> Result<(), RekeyError> {
     let console = js::console::Console::init(context);
     context
@@ -299,6 +337,8 @@ fn initialize_context(
             Attribute::all(),
         )
         .map_err(|err| RekeyError::GenericError(format!("failed to register console: {}", err)))?;
+
+    js::timer::Timer::init(context, timers)?;
 
     for vkey in VKEY_LOOKUP_BY_NAME.values() {
         let name = format!("VK_{}", vkey.name.to_ascii_uppercase());

@@ -35,6 +35,7 @@
 
 let altState = 'up';
 let altSequence = '';
+let doubleZeroTimeout = undefined;
 
 rekeyRegister("PID_026C", "*", handleKeyEvent);
 
@@ -50,7 +51,24 @@ function handleKeyEvent(ctx) {
   }
 
   if (ctx.key && ctx.direction === 'down') {
-    handleKey(ctx.key);
+    if (ctx.ch === '0') {
+      // timeout didn't occur so we must have gotten a very quick
+      // '0' then '0' which comes from '00' key
+      if (doubleZeroTimeout) {
+        clearTimeout(doubleZeroTimeout);
+        doubleZeroTimeout = undefined;
+        handleKey('00');
+      } else {
+        // could be a '00' key so set a quick timeout. If it occurs
+        // it must be the '0' key held down.
+        doubleZeroTimeout = setTimeout(() => {
+          doubleZeroTimeout = undefined;
+          handleKey('0');
+        }, 20);
+      }
+    } else {
+      handleKey(ctx.key);
+    }
   }
   return true;
 }
@@ -216,7 +234,10 @@ function handleKey(key) {
       console.log('right');
       break;
 
-    // TODO 00
+    // 00
+    case '00':
+      console.log('00');
+      break;
 
     // 1 / end
     case '1': case 'numpad1':
