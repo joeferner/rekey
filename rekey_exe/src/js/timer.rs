@@ -1,4 +1,5 @@
 use std::{
+    cmp,
     ops::Add,
     sync::{
         atomic::{AtomicU16, Ordering},
@@ -76,7 +77,18 @@ impl Timer {
                 }
             }
         }
-        return Result::Ok(results);
+
+        if let Option::Some(d) = results {
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map_err(|err| RekeyError::GenericError(format!("failed to get now: {}", err)))?
+                .as_millis();
+            let d = d.as_millis();
+            let dt = cmp::max(0, d - now) as u64;
+            return Result::Ok(Option::Some(Duration::from_millis(dt)));
+        } else {
+            return Result::Ok(Option::None);
+        }
     }
 
     pub fn run_timers(scripts: &Vec<Script<'_>>) -> Result<(), RekeyError> {
