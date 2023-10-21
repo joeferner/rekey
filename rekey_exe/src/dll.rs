@@ -9,8 +9,8 @@ use windows::{
 use crate::{debug, RekeyError};
 
 type PROC = unsafe extern "system" fn() -> isize;
-type FnInstall = extern "stdcall" fn(dll: HMODULE, hwnd: HWND) -> bool;
-type FnUninstall = extern "stdcall" fn() -> bool;
+type FnInstall = extern "C" fn(dll: u64, hwnd: u64) -> i32;
+type FnUninstall = extern "C" fn() -> i32;
 
 pub struct RekeyDll {
     dll: HMODULE,
@@ -39,8 +39,12 @@ impl RekeyDll {
 
     pub fn install(&mut self, hwnd: HWND) -> Result<(), RekeyError> {
         if let Option::Some(install) = self.install.take() {
-            if !install(self.dll, hwnd) {
-                return Result::Err(RekeyError::GenericError("failed to install".to_string()));
+            let install_ret = install(self.dll.0 as u64, hwnd.0 as u64);
+            if install_ret != 0 {
+                return Result::Err(RekeyError::GenericError(format!(
+                    "failed to install: {}",
+                    install_ret
+                )));
             }
             return Result::Ok(());
         } else {
@@ -50,8 +54,12 @@ impl RekeyDll {
 
     pub fn uninstall(&mut self) -> Result<(), RekeyError> {
         if let Option::Some(uninstall) = self.uninstall.take() {
-            if !uninstall() {
-                return Result::Err(RekeyError::GenericError("failed to uninstall".to_string()));
+            let uninstall_ret = uninstall();
+            if uninstall_ret != 0 {
+                return Result::Err(RekeyError::GenericError(format!(
+                    "failed to uninstall: {}",
+                    uninstall_ret
+                )));
             }
             unsafe {
                 FreeLibrary(self.dll).map_err(|err| {

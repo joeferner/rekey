@@ -1,8 +1,8 @@
 use lazy_static::lazy_static;
 use std::{
     env,
-    fs::File,
-    io::{Read, Write},
+    fs::{self, File},
+    io::Write,
     sync::Mutex,
 };
 
@@ -18,6 +18,8 @@ use windows::{
         },
     },
 };
+use windows::Win32::Foundation::HINSTANCE;
+use windows::Win32::System::SystemServices::{DLL_PROCESS_ATTACH, DLL_PROCESS_DETACH};
 
 type PROC = unsafe extern "system" fn() -> isize;
 
@@ -31,14 +33,37 @@ lazy_static! {
 }
 
 #[no_mangle]
-pub extern "C" fn install(dll: HMODULE, hwnd: HWND) -> bool {
-    match _install(dll, hwnd) {
+#[allow(non_snake_case, unused_variables)]
+extern "system" fn DllMain(
+    dll_module: HINSTANCE,
+    call_reason: u32,
+    _: *mut ())
+    -> bool
+{
+    match call_reason {
+        DLL_PROCESS_ATTACH => {
+            debug!("dll: attach");
+        }
+        DLL_PROCESS_DETACH => {
+            debug!("dll: detach");
+        }
+        _ => ()
+    }
+
+    return true;
+}
+
+#[no_mangle]
+pub extern "C" fn install(dll: u64, hwnd: u64) -> i32 {
+    debug!("dll: installing");
+    match _install(HMODULE(dll as isize), HWND(hwnd as isize)) {
         Result::Err(err) => {
-            debug!("install failed {}", err);
-            return false;
+            debug!("dll: install failed {}", err);
+            return 1;
         }
         Result::Ok(()) => {
-            return true;
+            debug!("dll: install success");
+            return 0;
         }
     };
 }
@@ -64,19 +89,20 @@ fn _install(dll: HMODULE, hwnd: HWND) -> Result<(), RekeyError> {
         write_global_data(&d)?;
         *data = Option::Some(d);
     }
-    debug("installed");
     return Result::Ok(());
 }
 
 #[no_mangle]
-pub extern "C" fn uninstall() -> bool {
+pub extern "C" fn uninstall() -> i32 {
+    debug!("dll: uninstalling");
     match _uninstall() {
         Result::Err(err) => {
-            debug!("uninstall failed {}", err);
-            return false;
+            debug!("dll: uninstall failed {}", err);
+            return 1;
         }
         Result::Ok(()) => {
-            return true;
+            debug!("dll: uninstall success");
+            return 0;
         }
     };
 }
@@ -97,7 +123,6 @@ fn _uninstall() -> Result<(), RekeyError> {
             *data = Option::None;
         }
     }
-    debug("uninstalled".to_string());
     return Result::Ok(());
 }
 
@@ -105,7 +130,7 @@ fn _uninstall() -> Result<(), RekeyError> {
 pub extern "C" fn keyboard_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match _keyboard_hook(code, wparam, lparam) {
         Result::Err(err) => {
-            debug!("keyboard_hook failed {}", err);
+            debug!("dll: keyboard_hook failed {}", err);
             return LRESULT(0);
         }
         Result::Ok(r) => {
@@ -143,21 +168,26 @@ fn _keyboard_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> Result<LRESULT, 
 fn read_global_data() -> Result<GlobalData, RekeyError> {
     let dir = env::temp_dir();
     let filename = dir.join("rekey.dat");
-    let filename_clone = filename.clone();
+    debug!("reading {}", filename.display());
 
-    let mut file = File::open(filename).map_err(|error| {
-        RekeyError::GenericError(format!(
-            "failed to create file: {}: {}",
-            filename_clone.display(),
-            error
-        ))
+    let contents = fs::read_to_string(filename)?;
+    let mut parts = contents.split(",");
+
+    let hhook_str = parts
+        .nth(0)
+        .ok_or_else(|| RekeyError::GenericError("failed to get hhook from file".to_string()))?;
+
+    let hwnd_str = parts
+        .nth(0)
+        .ok_or_else(|| RekeyError::GenericError("failed to get hwnd from file".to_string()))?;
+
+    let hhook = hhook_str.parse::<isize>().map_err(|err| {
+        RekeyError::GenericError(format!("failed to parse hhook to string {}", err))
     })?;
 
-    let mut buffer = [0; 8];
-    file.read_exact(&mut buffer)?;
-    let hhook = isize::from_le_bytes(buffer);
-    file.read_exact(&mut buffer)?;
-    let hwnd = isize::from_le_bytes(buffer);
+    let hwnd = hwnd_str.parse::<isize>().map_err(|err| {
+        RekeyError::GenericError(format!("failed to parse hwnd to string {}", err))
+    })?;
 
     return Result::Ok(GlobalData {
         hhook: HHOOK(hhook),
@@ -177,8 +207,6 @@ fn write_global_data(data: &GlobalData) -> Result<(), RekeyError> {
             error
         ))
     })?;
-    file.write_all(&data.hhook.0.to_le_bytes())?;
-    file.write_all(&data.hwnd.0.to_le_bytes())?;
-
+    write!(file, "{},{}", data.hhook.0, data.hwnd.0)?;
     return Result::Ok(());
 }

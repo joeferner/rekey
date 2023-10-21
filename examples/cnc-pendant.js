@@ -39,10 +39,8 @@ let doubleZeroTimeout = undefined;
 
 rekeyRegister("PID_026C", "*", handleKeyEvent);
 
-rekeyRegister("unknown", "*", handleKeyEvent);
-
 /**
- * @param {KeyData} ctx 
+ * @param {KeyData} ctx
  * @returns {boolean}
  */
 function handleKeyEvent(ctx) {
@@ -74,19 +72,31 @@ function handleKeyEvent(ctx) {
 }
 
 /**
- * @param {KeyData} ctx 
+ * @param {KeyData} ctx
  * @returns {boolean}
  */
 function handleAltCodes(ctx) {
-  if (ctx.vKeyCode == VK_ALT) {
+  if (ctx.vKeyCode === VK_ALT) {
     if (ctx.direction === 'up' && altSequence.length > 0) {
       switch (altSequence) {
-        case '36': handleKey('$', ctx); break;
-        case '40': handleKey('(', ctx); break;
-        case '41': handleKey(')', ctx); break;
-        case '61': handleKey('=', ctx); break;
-        case '0128': handleKey('€', ctx); break;
-        case '0165': handleKey('¥', ctx); break;
+        case '36':
+          handleKey('$', ctx);
+          break;
+        case '40':
+          handleKey('(', ctx);
+          break;
+        case '41':
+          handleKey(')', ctx);
+          break;
+        case '61':
+          handleKey('=', ctx);
+          break;
+        case '0128':
+          handleKey('€', ctx);
+          break;
+        case '0165':
+          handleKey('¥', ctx);
+          break;
         default:
           console.error(`unhandled alt code ${altSequence}`);
           break;
@@ -117,7 +127,7 @@ function handleAltCodes(ctx) {
 
 /**
  * @param {string} key
- * @param {KeyData} ctx 
+ * @param {KeyData} ctx
  * @returns {boolean}
  */
 function handleKey(key, ctx) {
@@ -178,7 +188,8 @@ function handleKey(key, ctx) {
       break;
 
     // 7 / home
-    case '7': case 'numpad7':
+    case '7':
+    case 'numpad7':
       console.log('7');
       break;
     case 'home':
@@ -186,7 +197,8 @@ function handleKey(key, ctx) {
       break;
 
     // 8 / up
-    case '8': case 'numpad8':
+    case '8':
+    case 'numpad8':
       console.log('8');
       break;
     case 'up':
@@ -194,7 +206,8 @@ function handleKey(key, ctx) {
       break;
 
     // 9 / page_up
-    case '9': case 'numpad9':
+    case '9':
+    case 'numpad9':
       console.log('9');
       break;
     case 'page_up':
@@ -212,7 +225,8 @@ function handleKey(key, ctx) {
       break;
 
     // 4 / left
-    case '4': case 'numpad4':
+    case '4':
+    case 'numpad4':
       console.log('4');
       break;
     case 'left':
@@ -220,7 +234,8 @@ function handleKey(key, ctx) {
       break;
 
     // 5 / clear
-    case '5': case 'numpad5':
+    case '5':
+    case 'numpad5':
       console.log('5');
       break;
     case 'clear':
@@ -228,7 +243,8 @@ function handleKey(key, ctx) {
       break;
 
     // 6 / right
-    case '6': case 'numpad6':
+    case '6':
+    case 'numpad6':
       console.log('6');
       break;
     case 'right':
@@ -241,7 +257,8 @@ function handleKey(key, ctx) {
       break;
 
     // 1 / end
-    case '1': case 'numpad1':
+    case '1':
+    case 'numpad1':
       console.log('1');
       break;
     case 'end':
@@ -249,7 +266,8 @@ function handleKey(key, ctx) {
       break;
 
     // 2 / down
-    case '2': case 'numpad2':
+    case '2':
+    case 'numpad2':
       console.log('2');
       break;
     case 'down':
@@ -257,7 +275,8 @@ function handleKey(key, ctx) {
       break;
 
     // 3 / page_down
-    case '3': case 'numpad3':
+    case '3':
+    case 'numpad3':
       console.log('3');
       break;
     case 'page_down':
@@ -270,7 +289,8 @@ function handleKey(key, ctx) {
       break;
 
     // 0 / insert
-    case '0': case 'numpad0':
+    case '0':
+    case 'numpad0':
       console.log('0');
       break;
     case 'insert':
@@ -286,7 +306,8 @@ function handleKey(key, ctx) {
       break;
 
     // ignore
-    case 'num_lock': break;
+    case 'num_lock':
+      break;
 
     default:
       console.error(`unhandled key ${key}: ${JSON.stringify(ctx)}`);

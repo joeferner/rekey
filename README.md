@@ -1,3 +1,15 @@
+# About
+
+ReKey is a Windows application designed to intercept keyboard input and execute JavaScript in response.
+Keyboard input can be filtered based on devices allowing multiple keyboard behave differently. 
+
+# Build
+
+```bash
+rustup target add i686-pc-windows-msvc
+cargo build
+```
+
 # Reference
 
 - [windows crate documentation](https://microsoft.github.io/windows-docs-rs/doc/windows/index.html)

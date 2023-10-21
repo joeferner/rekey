@@ -12,4 +12,4 @@ rekey_common = { path = "../rekey_common/", version = "0.1.0" }
 
 [dependencies.windows]
 version = "0.51.1"
-features = ["Win32_Foundation"]
+features = ["Win32_Foundation", "Win32_System_SystemServices", ]
