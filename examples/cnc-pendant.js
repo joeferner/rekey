@@ -57,17 +57,17 @@ function handleKeyEvent(ctx) {
       if (doubleZeroTimeout) {
         clearTimeout(doubleZeroTimeout);
         doubleZeroTimeout = undefined;
-        handleKey('00');
+        handleKey('00', ctx);
       } else {
         // could be a '00' key so set a quick timeout. If it occurs
         // it must be the '0' key held down.
         doubleZeroTimeout = setTimeout(() => {
           doubleZeroTimeout = undefined;
-          handleKey('0');
+          handleKey('0', ctx);
         }, 20);
       }
     } else {
-      handleKey(ctx.key);
+      handleKey(ctx.key, ctx);
     }
   }
   return true;
@@ -81,12 +81,12 @@ function handleAltCodes(ctx) {
   if (ctx.vKeyCode == VK_ALT) {
     if (ctx.direction === 'up' && altSequence.length > 0) {
       switch (altSequence) {
-        case '36': handleKey('$'); break;
-        case '40': handleKey('('); break;
-        case '41': handleKey(')'); break;
-        case '61': handleKey('='); break;
-        case '0128': handleKey('€'); break;
-        case '0165': handleKey('¥'); break;
+        case '36': handleKey('$', ctx); break;
+        case '40': handleKey('(', ctx); break;
+        case '41': handleKey(')', ctx); break;
+        case '61': handleKey('=', ctx); break;
+        case '0128': handleKey('€', ctx); break;
+        case '0165': handleKey('¥', ctx); break;
         default:
           console.error(`unhandled alt code ${altSequence}`);
           break;
@@ -117,9 +117,10 @@ function handleAltCodes(ctx) {
 
 /**
  * @param {string} key
+ * @param {KeyData} ctx 
  * @returns {boolean}
  */
-function handleKey(key) {
+function handleKey(key, ctx) {
   switch (key) {
     // fn+calc
     case '$':
@@ -288,7 +289,7 @@ function handleKey(key) {
     case 'num_lock': break;
 
     default:
-      console.error(`unhandled key ${key}`);
+      console.error(`unhandled key ${key}: ${JSON.stringify(ctx)}`);
       break;
   }
 }
