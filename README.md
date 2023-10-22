@@ -19,3 +19,4 @@ cargo build
 - [luamacros](https://github.com/me2d13/luamacros)
 - [Using Hooks](https://learn.microsoft.com/en-us/windows/win32/winmsg/using-hooks)
 - [Building a Win32 Rust App From Scratch](https://rust-tutorials.github.io/triangle-from-scratch/opening_a_window/win32.html)
+- [TypeScript compiler API](https://github.com/Microsoft/TypeScript/wiki/Using-the-Compiler-API)
