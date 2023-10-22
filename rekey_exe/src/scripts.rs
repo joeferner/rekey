@@ -290,13 +290,12 @@ fn load_scripts<'a>(script_dir: PathBuf) -> Result<Vec<Script<'a>>, RekeyError> 
     for entry in fs::read_dir(&script_dir)? {
         let entry = entry?;
         let entry_path = entry.path();
-        if entry_path
+        let extension = entry_path
             .extension()
             .unwrap_or_default()
             .to_str()
-            .unwrap_or_default()
-            != "js"
-        {
+            .unwrap_or_default();
+        if extension != "js" && extension != "ts" {
             continue;
         }
         debug!("loading script: {}", entry_path.display());
@@ -307,15 +306,39 @@ fn load_scripts<'a>(script_dir: PathBuf) -> Result<Vec<Script<'a>>, RekeyError> 
         initialize_context(&mut context, &key_handlers, &timers)?;
 
         let script_path = &entry_path.as_path();
-        let source = Source::from_filepath(script_path)
-            .map_err(|err| RekeyError::GenericError(format!("failed to load script: {}", err)))?;
-        context.eval(source).map_err(|err| {
-            RekeyError::GenericError(format!(
-                "failed to evaluate script {}: {}",
-                entry_path.display(),
-                err
-            ))
-        })?;
+        if extension == "ts" {
+            let typescript = include_str!("../target/generated/typescript.js");
+            let typescript_source = Source::from_bytes(typescript);
+            context.eval(typescript_source).map_err(|err| {
+                RekeyError::GenericError(format!(
+                    "failed to evaluate script {}: {}",
+                    entry_path.display(),
+                    err
+                ))
+            })?;
+
+            let compile_code = r#"console.log(ts)"#;
+            let compile_source = Source::from_bytes(compile_code);
+            context.eval(compile_source).map_err(|err| {
+                RekeyError::GenericError(format!(
+                    "failed to evaluate script {}: {}",
+                    entry_path.display(),
+                    err
+                ))
+            })?;
+        } else {
+            let source = Source::from_filepath(script_path).map_err(|err| {
+                RekeyError::GenericError(format!("failed to load script: {}", err))
+            })?;
+            context.eval(source).map_err(|err| {
+                RekeyError::GenericError(format!(
+                    "failed to evaluate script {}: {}",
+                    entry_path.display(),
+                    err
+                ))
+            })?;
+        }
+
         results.push(Script {
             context: Arc::new(Mutex::new(context)),
             key_handlers,

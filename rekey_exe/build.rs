@@ -1,4 +1,4 @@
-use rekey_common::{vkeys::VKEY_LOOKUP_BY_NAME, REKEY_API_JS_FILENAME};
+use rekey_common::{vkeys::VKEY_LOOKUP_BY_NAME, REKEY_API_JS_FILENAME, TYPESCRIPT_JS_FILENAME};
 use std::{fs, io};
 use winres::WindowsResource;
 
@@ -10,6 +10,7 @@ fn main() -> io::Result<()> {
     }
 
     generate_javascript_template()?;
+    copy_typescript()?;
 
     Ok(())
 }
@@ -30,6 +31,20 @@ fn generate_javascript_template() -> io::Result<()> {
 
     fs::write(
         "target/generated/".to_string() + REKEY_API_JS_FILENAME,
+        contents,
+    )?;
+
+    return Ok(());
+}
+
+fn copy_typescript() -> io::Result<()> {
+    let mut contents = fs::read_to_string("../scripts//node_modules/typescript/lib/typescript.js")?;
+    fs::create_dir_all("target/generated")?;
+
+    contents = contents.replace("debugger;", "");
+
+    fs::write(
+        "target/generated/".to_string() + TYPESCRIPT_JS_FILENAME,
         contents,
     )?;
 

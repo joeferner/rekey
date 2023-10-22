@@ -5,7 +5,9 @@ use vkeys::VKEY_LOOKUP_BY_NAME;
 use windows::Win32::{
     Foundation::LRESULT,
     UI::{
-        Input::KeyboardAndMouse::{VkKeyScanW, VIRTUAL_KEY, VK_0, VK_9, VK_NUMPAD0, VK_NUMPAD9, VK_Z, VK_A},
+        Input::KeyboardAndMouse::{
+            VkKeyScanW, VIRTUAL_KEY, VK_0, VK_9, VK_A, VK_NUMPAD0, VK_NUMPAD9, VK_Z,
+        },
         WindowsAndMessaging::WM_USER,
     },
 };
@@ -17,6 +19,7 @@ pub const WM_USER_SHELL_ICON: u32 = WM_USER + 301;
 pub const DONT_SKIP_INPUT: LRESULT = LRESULT(1);
 pub const SKIP_INPUT: LRESULT = LRESULT(42);
 pub const REKEY_API_JS_FILENAME: &str = "rekey-api.js";
+pub const TYPESCRIPT_JS_FILENAME: &str = "typescript.js";
 
 #[derive(Debug)]
 pub enum RekeyError {
