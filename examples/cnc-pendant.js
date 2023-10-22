@@ -36,11 +36,28 @@
 let altState = 'up';
 let altSequence = '';
 let doubleZeroTimeout = undefined;
+let sentCtrlAltDown = false;
 
 rekeyRegister({ deviceFilter: "PID_026C", intercept: true }, handleKeyEvent);
 
 /**
- * @param {KeyEvent} event
+ * @param {string} ch
+ * @param {KeyData} event
+ */
+function sendCtrlAlt(ch, event) {
+  if (event.direction === 'down' && !sentCtrlAltDown) {
+    sendKey('ctrl+alt', 'down');
+    sentCtrlAltDown = true;
+  }
+  sendKey(ch, event.direction);
+  if (event.direction === 'up' && sentCtrlAltDown) {
+    sendKey('ctrl+alt', 'up');
+    sentCtrlAltDown = false;
+  }
+}
+
+/**
+ * @param {KeyData} event
  * @returns {boolean}
  */
 function handleKeyEvent(event) {
@@ -48,54 +65,67 @@ function handleKeyEvent(event) {
     return true;
   }
 
+  if (handleDoubleZero(event)) {
+    return true;
+  }
+
+  handleKey(event.key, event);
+  return true;
+}
+
+/**
+ * @param {KeyData} event
+ * @returns {boolean} true, if handled
+ */
+function handleDoubleZero(event) {
+  if (event.ch !== '0') {
+    return false;
+  }
+
   if (event.key && event.direction === 'down') {
-    if (event.ch === '0') {
-      // timeout didn't occur so we must have gotten a very quick
-      // '0' then '0' which comes from '00' key
-      if (doubleZeroTimeout) {
-        clearTimeout(doubleZeroTimeout);
-        doubleZeroTimeout = undefined;
-        handleKey('00', event);
-      } else {
-        // could be a '00' key so set a quick timeout. If it occurs
-        // it must be the '0' key held down.
-        doubleZeroTimeout = setTimeout(() => {
-          doubleZeroTimeout = undefined;
-          handleKey('0', event);
-        }, 20);
-      }
+    // timeout didn't occur so we must have gotten a very quick
+    // '0' then '0' which comes from '00' key
+    if (doubleZeroTimeout) {
+      clearTimeout(doubleZeroTimeout);
+      doubleZeroTimeout = undefined;
+      handleKey('00');
     } else {
-      handleKey(event.key, event);
+      // could be a '00' key so set a quick timeout. If it occurs
+      // it must be the '0' key held down.
+      doubleZeroTimeout = setTimeout(() => {
+        doubleZeroTimeout = undefined;
+        handleKey('0');
+      }, 20);
     }
   }
   return true;
 }
 
 /**
- * @param {KeyEvent} event
- * @returns {boolean}
+ * @param {KeyData} event
+ * @returns {boolean} true, if handled
  */
 function handleAltCodes(event) {
   if (event.vKeyCode == VK_ALT) {
     if (event.direction === 'up' && altSequence.length > 0) {
       switch (altSequence) {
         case '36':
-          handleKey('$', event);
+          handleKey('$');
           break;
         case '40':
-          handleKey('(', event);
+          handleKey('(');
           break;
         case '41':
-          handleKey(')', event);
+          handleKey(')');
           break;
         case '61':
-          handleKey('=', event);
+          handleKey('=');
           break;
         case '0128':
-          handleKey('€', event);
+          handleKey('€');
           break;
         case '0165':
-          handleKey('¥', event);
+          handleKey('¥');
           break;
         default:
           console.error(`unhandled alt code ${altSequence}`);
@@ -127,7 +157,7 @@ function handleAltCodes(event) {
 
 /**
  * @param {string} key
- * @param {KeyEvent} event
+ * @param {KeyData} [event]
  * @returns {boolean}
  */
 function handleKey(key, event) {
@@ -202,7 +232,8 @@ function handleKey(key, event) {
       console.log('8');
       break;
     case 'up':
-      console.log('up');
+      // Send: Y+
+      sendCtrlAlt('w', event);
       break;
 
     // 9 / page_up
@@ -211,12 +242,18 @@ function handleKey(key, event) {
       console.log('9');
       break;
     case 'page_up':
-      console.log('page up');
+      // Send: Z+
+      sendCtrlAlt('r', event);
       break;
 
     // add
     case 'add':
-      console.log('add');
+      if (event.direction === 'up') {
+        // Send: Multiply XY Step Size by 10
+        sendKey('ctrl+alt+t');
+        // Send: Multiply Z Step Size by 10
+        sendKey('ctrl+alt+y');
+      }
       break;
 
     // tab
@@ -230,7 +267,8 @@ function handleKey(key, event) {
       console.log('4');
       break;
     case 'left':
-      console.log('left');
+      // Send: X-
+      sendCtrlAlt('a', event);
       break;
 
     // 5 / clear
@@ -239,7 +277,8 @@ function handleKey(key, event) {
       console.log('5');
       break;
     case 'clear':
-      console.log('clear');
+      // Send: Home
+      sendCtrlAlt('q', event);
       break;
 
     // 6 / right
@@ -248,7 +287,8 @@ function handleKey(key, event) {
       console.log('6');
       break;
     case 'right':
-      console.log('right');
+      // Send: X+
+      sendCtrlAlt('d', event);
       break;
 
     // 00
@@ -271,7 +311,8 @@ function handleKey(key, event) {
       console.log('2');
       break;
     case 'down':
-      console.log('down');
+      // Send: Y-
+      sendCtrlAlt('s', event);
       break;
 
     // 3 / page_down
@@ -280,12 +321,18 @@ function handleKey(key, event) {
       console.log('3');
       break;
     case 'page_down':
-      console.log('page down');
+      // Send: Z-
+      sendCtrlAlt('f', event);
       break;
 
     // enter
     case 'enter':
-      console.log('enter');
+      if (event.direction === 'up') {
+        // Send: Divide XY Step Size by 10
+        sendKey('ctrl+alt+g');
+        // Send: Divide Z Step Size by 10
+        sendKey('ctrl+alt+h');
+      }
       break;
 
     // 0 / insert
