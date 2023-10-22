@@ -8,12 +8,10 @@
  * @global
  * @function
  * @name rekeyRegister
- * @param {string|'*'} deviceFilter If '*' no device filtering will be done. If a string is passed and the
- *                                  device name contains that string the callback will be called.
- * @param {'*'} keyFilter Currently must be '*' and no key filtering will be done.
+ * @param {RegisterOptions} options Options to filter keys
  * @param {keyCallback} callback Callback to be called on each key event
  */
-function rekeyRegister(deviceFilter, keyFilter, callback) {}
+function rekeyRegister(options, callback) { }
 
 /**
  * Send a key event
@@ -25,7 +23,7 @@ function rekeyRegister(deviceFilter, keyFilter, callback) {}
  * @param {'up'|'down'} [direction] If specified only send the given key direction, otherwise send both down
  *                                  and up events.
  */
-function sendKey(keyExpression, direction) {}
+function sendKey(keyExpression, direction) { }
 
 /**
  * Get the state of a key
@@ -36,12 +34,12 @@ function sendKey(keyExpression, direction) {}
  * @param {number} vKeyCode The virtual key code
  * @returns {GetKeyStateResult}
  */
-function getKeyState(vKeyCode) {}
+function getKeyState(vKeyCode) { }
 
 /**
  * Data passed to the rekeyRegister callback.
  * 
- * @typedef {Object} KeyData
+ * @typedef {Object} KeyEvent
  * @property {number} vKeyCode Virtual key code
  * @property {string} [key] String representation of the key.
  * @property {string} [ch] String representation of the key.
@@ -50,8 +48,16 @@ function getKeyState(vKeyCode) {}
  */
 
 /**
+ * @typedef {Object} RegisterOptions
+ * @param {string} [deviceFilter] If present no device filtering will be done. If a string is passed and the
+ *                                  device name contains that string the callback will be called.
+ * @param {'*'} [keyFilter] Currently must be '*' and no key filtering will be done.
+ * @param {boolean} [intercept] If true the result of the callback can effect if the key gets passed on to the system.
+ */
+
+/**
  * @callback keyCallback
- * @param {KeyData} data Data about the key press
+ * @param {KeyEvent} event Data about the key press
  * @returns {boolean} true, if the keyboard event should be filtered. false, if the keyboard event should not be filterd.
  */
 

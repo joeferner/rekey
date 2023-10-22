@@ -30,19 +30,20 @@ use crate::{
 };
 
 #[derive(PartialEq, Eq)]
-enum KeyHandlerDevices {
+enum KeyHandlerDeviceFilter {
     All,
     Contains(String),
 }
 
 #[derive(PartialEq, Eq)]
-enum KeyHandlerKeys {
+enum KeyHandlerKeyFilter {
     All,
 }
 
 struct KeyHandler {
-    devices: KeyHandlerDevices,
-    keys: KeyHandlerKeys,
+    device_filter: KeyHandlerDeviceFilter,
+    key_filter: KeyHandlerKeyFilter,
+    intercept: bool,
     callback: JsObject,
 }
 
@@ -204,13 +205,13 @@ fn thread_run_key_handler_callbacks(
     script: &Script,
     key_handler: &KeyHandler,
 ) -> ThreadResponseMessage {
-    match key_handler.keys {
-        KeyHandlerKeys::All => {}
+    match key_handler.key_filter {
+        KeyHandlerKeyFilter::All => {}
     }
 
-    match &key_handler.devices {
-        KeyHandlerDevices::All => {}
-        KeyHandlerDevices::Contains(contains_str) => {
+    match &key_handler.device_filter {
+        KeyHandlerDeviceFilter::All => {}
+        KeyHandlerDeviceFilter::Contains(contains_str) => {
             if let Option::Some(device) = &msg.device {
                 if !device.device_name.contains(contains_str) {
                     return Result::Ok(SkipInput::DontSkip);
@@ -277,7 +278,7 @@ fn thread_run_key_handler_callbacks(
         .callback
         .call(&this, &args, &mut context)
         .map_err(|err| RekeyError::GenericError(format!("failed to run callback: {}", err)))?;
-    if results.to_boolean() == false {
+    if key_handler.intercept == false || results.to_boolean() == false {
         return Result::Ok(SkipInput::DontSkip);
     } else {
         return Result::Ok(SkipInput::Skip);
@@ -561,43 +562,63 @@ fn create_input(vkey: VIRTUAL_KEY, up: bool) -> INPUT {
 fn handle_register(
     _this: &JsValue,
     args: &[JsValue],
-    _context: &mut Context<'_>,
+    context: &mut Context<'_>,
 ) -> Result<KeyHandler, JsError> {
-    // devices, keys, callback
-    if args.len() == 3 {
-        let devices = args.get(0).unwrap();
-        let keys = args.get(1).unwrap();
-        let callback = args.get(2).unwrap();
+    // options, callback
+    if args.len() == 2 {
+        let options = args.get(0).unwrap();
+        let callback = args.get(1).unwrap();
 
-        if devices.is_string() && keys.is_string() && callback.is_callable() {
-            let devices = devices.as_string().unwrap().to_std_string_escaped();
-            let keys = keys.as_string().unwrap().to_std_string_escaped();
+        if options.is_object() && callback.is_callable() {
+            let options = options.as_object().unwrap();
+            let device_filter = options.get("deviceFilter", context)?;
+            let key_filter = options.get("keyFilter", context)?;
+            let intercept = options.get("intercept", context)?;
             let callback = callback.as_callable().unwrap();
-            if keys != "*" {
+
+            let key_filter = if key_filter.is_undefined()
+                || (key_filter.is_string() && key_filter.as_string().unwrap() == "*")
+            {
+                KeyHandlerKeyFilter::All
+            } else {
+                return Result::Err(JsError::from(JsNativeError::error().with_message(
+                    "invalid keyFilter arguments for rekeyRegister, expected \"*\"",
+                )));
+            };
+
+            let device_filter = if device_filter.is_undefined() {
+                KeyHandlerDeviceFilter::All
+            } else if device_filter.is_string() {
+                let str = device_filter.as_string().unwrap().to_std_string_escaped();
+                if str == "*" {
+                    KeyHandlerDeviceFilter::All
+                } else {
+                    KeyHandlerDeviceFilter::Contains(str)
+                }
+            } else {
                 return Result::Err(JsError::from(
                     JsNativeError::error()
-                        .with_message("invalid keys arguments for rekeyRegister, expected \"*\""),
+                        .with_message("invalid deviceFilter arguments for rekeyRegister."),
                 ));
-            }
-            let devices = if devices == "*" {
-                KeyHandlerDevices::All
-            } else {
-                KeyHandlerDevices::Contains(devices)
             };
+
+            let intercept = intercept.to_boolean();
+
             return Result::Ok(KeyHandler {
-                devices,
-                keys: KeyHandlerKeys::All,
+                device_filter,
+                key_filter,
+                intercept,
                 callback: callback.clone(),
             });
         } else {
             return Result::Err(JsError::from(
                 JsNativeError::error()
-                    .with_message("invalid arguments, expected rekeyRegister(devices: string, keys: string, callback: (ctx) => boolean)"),
+                    .with_message("invalid arguments, expected rekeyRegister(options: RegisterOptions, callback: (event) => boolean)"),
             ));
         }
     } else {
         return Result::Err(JsError::from(JsNativeError::error().with_message(format!(
-            "invalid arguments for rekeyRegister, expected 3 found {}",
+            "invalid arguments for rekeyRegister, expected 2 found {}",
             args.len()
         ))));
     }

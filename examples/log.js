@@ -1,5 +1,5 @@
 
-rekeyRegister("*", "*", ctx => {
-  console.log(JSON.stringify(ctx));
+rekeyRegister({}, event => {
+  console.log(JSON.stringify(event));
   return false;
 });
